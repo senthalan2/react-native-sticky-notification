@@ -1,10 +1,10 @@
 {
   "name": "react-native-sticky-notification",
-  "version": "1.1.1",
+  "version": "1.1.3",
   "description": "Customizable Sticky Notification for Android",
-  "main": "lib/commonjs/index",
+  "main": "src/index.js",
   "module": "lib/module/index",
-  "types": "lib/typescript/index.d.ts",
+  "types": "src/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
   "files": [

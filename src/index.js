@@ -17,7 +17,7 @@ const StickyNotification = NativeModules.StickyNotification
       }
     );
 
-export const StickyNotificationService = ({ onPressButton }) => {
+const StickyNotificationService = ({ onPressButton }) => {
   DeviceEventEmitter.addListener('action', (buttonName) => {
     onPressButton(buttonName);
   });
@@ -71,3 +71,5 @@ export const startService = () => {
 export const stopService = () => {
   return StickyNotification.stopService();
 };
+
+export default StickyNotificationService;

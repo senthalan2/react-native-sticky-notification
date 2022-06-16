@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
 
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import {
-  StickyNotificationService,
+import StickyNotificationService, {
   createChannel,
   stopService,
   startService,

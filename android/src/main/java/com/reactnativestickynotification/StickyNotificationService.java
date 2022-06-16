@@ -26,12 +26,12 @@ public class StickyNotificationService extends Service{
 
     return null;
   }
-
-  @Override
-  public void onCreate() {
-    super.onCreate();
-
-  }
+//
+//  @Override
+//  public void onCreate() {
+//    super.onCreate();
+//
+//  }
 
   @Override
   public void onDestroy() {
