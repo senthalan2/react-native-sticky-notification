@@ -16,12 +16,12 @@ export default function App() {
     channelId: CHANNEL_ID, //required
     channelName: CHANNEL_NAME, //required
     importance: 'default', // default importance is "default"
-    totalProcessCount: 12, // Total Icons which are added in android drawable,
+    totalProcessCount: 1, // Total Icons which are added in android drawable,
   };
 
   let serviceConfig = {
-    displayTexts: ['abc', 'cde', 'fgd'], //default value is ["b1","b2","b3","b4","b5"]
-    displayIcons: [5, 3, 0], // Icons Indices  - - ->>>> starts from 0 to ( totalProcessCount - 1 )
+    displayTexts: ['abc'], //default value is ["b1","b2","b3","b4","b5"] ->>>>>>> max array length 5
+    displayIcons: [0], // Icons Indices  - - ->>>> starts from 0 to ( totalProcessCount - 1 ) default value is [0,1,2,3,4] ->>>>>>> max array length 5
     exitEnabled: false, //default value is true            //If true Service stopped when click the last button
     icon: 'app-icon', //1. app-icon 2.app-icon-rounded 3.other  //default "app-icon"
   };
