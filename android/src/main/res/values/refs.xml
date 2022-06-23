@@ -12,6 +12,67 @@
   <item type="drawable" name="notification_icon">
     @drawable/notification_icon
   </item>
+  <item type="drawable" name="img1">
+    @drawable/img1
+  </item>
+  <item type="drawable" name="img2">
+    @drawable/img2
+  </item>
+  <item type="drawable" name="img3">
+    @drawable/img3
+  </item>
+  <item type="drawable" name="img4">
+    @drawable/img4
+  </item>
+  <item type="drawable" name="img5">
+    @drawable/img5
+  </item>
+  <item type="drawable" name="img6">
+    @drawable/img6
+  </item>
+  <item type="drawable" name="img7">
+    @drawable/img7
+  </item>
+  <item type="drawable" name="img8">
+    @drawable/img8
+  </item>
+  <item type="drawable" name="img9">
+    @drawable/img9
+  </item>
+  <item type="drawable" name="img10">
+    @drawable/img10
+  </item>
+  <item type="drawable" name="img11">
+    @drawable/img11
+  </item>
+  <item type="drawable" name="img12">
+    @drawable/img12
+  </item>
+  <item type="drawable" name="img13">
+    @drawable/img13
+  </item>
+  <item type="drawable" name="img14">
+    @drawable/img14
+  </item>
+  <item type="drawable" name="img15">
+    @drawable/img15
+  </item>
+  <item type="drawable" name="img16">
+    @drawable/img16
+  </item>
+  <item type="drawable" name="img17">
+    @drawable/img17
+  </item>
+  <item type="drawable" name="img18">
+    @drawable/img18
+  </item>
+  <item type="drawable" name="img19">
+    @drawable/img19
+  </item>
+  <item type="drawable" name="img20">
+    @drawable/img20
+  </item>
+
   <item type="id" name="b1">
     @id/b1
   </item>
@@ -27,6 +88,23 @@
   <item type="id" name="b5">
     @id/b5
   </item>
+
+  <item type="id" name="icon_1">
+    @id/icon_1
+  </item>
+  <item type="id" name="icon_2">
+    @id/icon_2
+  </item>
+  <item type="id" name="icon_3">
+    @id/icon_3
+  </item>
+  <item type="id" name="icon_4">
+    @id/icon_4
+  </item>
+  <item type="id" name="icon_5">
+    @id/icon_5
+  </item>
+
   <item type="id" name="t1">
     @id/t1
   </item>

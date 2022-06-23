@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { NativeModules, Platform, DeviceEventEmitter } from 'react-native';
 
 const LINKING_ERROR =
@@ -18,9 +19,11 @@ const StickyNotification = NativeModules.StickyNotification
     );
 
 const StickyNotificationService = ({ onPressButton }) => {
-  DeviceEventEmitter.addListener('action', (buttonName) => {
-    onPressButton(buttonName);
-  });
+  useEffect(() => {
+    DeviceEventEmitter.addListener('action', (buttonName) => {
+      onPressButton(buttonName);
+    });
+  }, []);
 
   return null;
 };
@@ -29,43 +32,82 @@ export const removeOnClickListener = () => {
   DeviceEventEmitter.removeAllListeners();
 };
 
-export const createChannel = ({ channelId, channelName, ...props }) => {
+export const createChannel = ({
+  channelId,
+  channelName,
+  importance,
+  totalProcessCount,
+}) => {
   return new Promise((resolve, reject) => {
     if (!channelId) {
       reject('Channel Id is required!');
-      return;
-    }
-
-    if (!channelName) {
-      reject('Channel Name is required!');
-      return;
-    }
-
-    if (typeof channelId != 'string') {
+    } else if (typeof channelId != 'string') {
       reject('Channel Id must be String!');
-      return;
-    }
-    if (typeof channelName != 'string') {
+    } else if (!channelName) {
+      reject('Channel Name is required!');
+    } else if (typeof channelName != 'string') {
       reject('Channel Name must be String!');
-      return;
-    }
-
-    StickyNotification.createChannel({
-      channelId: channelId,
-      channelName: channelName,
-      ...props,
-    })
-      .then((res) => {
-        resolve(res);
+    } else if (totalProcessCount > 20) {
+      reject('Total Process Count must be less than or equal to 20!');
+    } else if (totalProcessCount <= 0) {
+      reject('Total Process Count must be greater than 0!');
+    } else {
+      StickyNotification.createChannel({
+        channelId: channelId,
+        channelName: channelName,
+        importance: importance,
+        totalProcessButtonsCount: totalProcessCount,
       })
-      .catch((error) => {
-        reject(error);
-      });
+        .then((res) => {
+          resolve(res);
+        })
+        .catch((error) => {
+          reject(error);
+        });
+    }
   });
 };
 
-export const startService = () => {
-  return StickyNotification.startService();
+export const startService = ({
+  displayTexts = ['b1', 'b2', 'b3', 'b4', 'b5'],
+  displayIcons = [0, 1, 2, 3, 4],
+  exitEnabled = false,
+  icon = 'app-icon',
+}) => {
+  return new Promise((resolve, reject) => {
+    if (!Array.isArray(displayTexts)) {
+      reject('Invalid Display Texts List!');
+    } else if (!Array.isArray(displayIcons)) {
+      reject('Invalid Display Icons List!');
+    } else if (displayTexts.length > 5) {
+      reject('Length of Display Texts List must be less than or equal to 5!');
+    } else if (displayTexts.length <= 0) {
+      reject('Length of Display Texts List must be greater than 0!');
+    } else if (displayIcons.length > 5) {
+      reject('Length of Display Icons List must be less than or equal to 5!');
+    } else if (displayIcons.length <= 0) {
+      reject('Length of Display Icons List must be greater than 0!');
+    } else if (displayTexts.length !== displayIcons.length) {
+      reject(
+        'Length of Display Icons List and Length of Display Texts List must be same!'
+      );
+    } else {
+      StickyNotification.startService({
+        displayTexts: displayTexts,
+        displayIcons: [...displayIcons].map((itemIndex) =>
+          itemIndex.toString()
+        ),
+        exitEnabled: exitEnabled,
+        icon: icon,
+      })
+        .then((res) => {
+          resolve(res);
+        })
+        .catch((err) => {
+          reject(err);
+        });
+    }
+  });
 };
 
 export const stopService = () => {

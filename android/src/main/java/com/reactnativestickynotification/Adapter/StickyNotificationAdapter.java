@@ -1,10 +1,11 @@
 package com.reactnativestickynotification.Adapter;
 
-import static com.reactnativestickynotification.Adapter.RNProps.CHANNEL_ID;
-import static com.reactnativestickynotification.Adapter.RNProps.CHANNEL_NAME;
+import static com.reactnativestickynotification.Adapter.RNProps.DISPLAY_ICONS;
 import static com.reactnativestickynotification.Adapter.RNProps.DISPLAY_TEXTS;
 import static com.reactnativestickynotification.Adapter.RNProps.EXIT_ENABLED;
 import static com.reactnativestickynotification.Adapter.RNProps.ICON;
+
+import android.util.Log;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
@@ -14,6 +15,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.reactnativestickynotification.StickyNotificationModule;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Objects;
 
 import javax.annotation.Nullable;
@@ -23,10 +25,12 @@ public class StickyNotificationAdapter implements StickyNotificationProps {
   public ReadableMap props;
   public Promise promise;
   public int buttonsCount;
+  public int iconsCount;
 
   public StickyNotificationAdapter(@Nullable ReadableMap props, Promise promise) {
     this.props = props;
     this.promise = promise;
+
 
   }
 
@@ -36,14 +40,10 @@ public class StickyNotificationAdapter implements StickyNotificationProps {
   }
 
   @Override
-  public String channelId() {
-    return getStringValue(CHANNEL_ID,"sticky_notification_service");
+  public ArrayList<String> displayIcons() {
+    return getIcons(DISPLAY_ICONS);
   }
 
-  @Override
-  public String channelName() {
-    return getStringValue(CHANNEL_NAME,"sticky_notification_service");
-  }
 
   @Override
   public Boolean exitEnabled() {
@@ -51,17 +51,21 @@ public class StickyNotificationAdapter implements StickyNotificationProps {
 
   }
 
+
   @Override
   public int buttonsCount() {
     return buttonsCount;
   }
 
   @Override
+  public int iconsCount() {
+    return iconsCount;
+  }
+
+  @Override
   public String icon() {
     return getStringValue(ICON,"app-icon");
   }
-
-
 
   @Override
   public void onPress(String clickedButton) {
@@ -79,6 +83,26 @@ public class StickyNotificationAdapter implements StickyNotificationProps {
       promise.reject("Error",e.getMessage());
     }
 
+  }
+
+
+  public ArrayList<String> getIcons(RNProps prop){
+    ArrayList<String> displayIcons = new ArrayList<>();
+    for(int i=0;i<displayTexts().length;i++){
+      displayIcons.add(Integer.toString(i+1));
+    }
+
+    if(props.hasKey(prop.value())){
+
+      ArrayList<Object> iconsList = Objects.requireNonNull(props.getArray("displayIcons")).toArrayList();
+      iconsCount=iconsList.toArray().length;
+      displayIcons.clear();
+      for(int i=0;i<iconsList.toArray().length;i++){
+        displayIcons.add(iconsList.get(i).toString());
+      }
+      return displayIcons;
+    }
+    return displayIcons;
   }
 
 

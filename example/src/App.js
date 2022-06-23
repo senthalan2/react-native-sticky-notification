@@ -8,11 +8,20 @@ import StickyNotificationService, {
   removeOnClickListener,
 } from 'react-native-sticky-notification';
 
+const CHANNEL_ID = 'sampleproject';
+const CHANNEL_NAME = 'sampleproject';
+
 export default function App() {
-  let config = {
-    channelId: 'sampleproject', //required
-    channelName: 'sampleproject', //required
-    displayTexts: ['abc', 'def', 'ghi'], //default value is ["b1","b2","b3","b4","b5"]
+  let channelConfig = {
+    channelId: CHANNEL_ID, //required
+    channelName: CHANNEL_NAME, //required
+    importance: 'default', // default importance is "default"
+    totalProcessCount: 12, // Total Icons which are added in android drawable,
+  };
+
+  let serviceConfig = {
+    displayTexts: ['abc', 'cde', 'fgd'], //default value is ["b1","b2","b3","b4","b5"]
+    displayIcons: [5, 3, 0], // Icons Indices  - - ->>>> starts from 0 to ( totalProcessCount - 1 )
     exitEnabled: false, //default value is true            //If true Service stopped when click the last button
     icon: 'app-icon', //1. app-icon 2.app-icon-rounded 3.other  //default "app-icon"
   };
@@ -34,7 +43,7 @@ export default function App() {
       <TouchableOpacity
         style={styles.button}
         onPress={() => {
-          createChannel(config)
+          createChannel(channelConfig)
             .then((e) => {
               console.log(e);
             })
@@ -48,7 +57,7 @@ export default function App() {
       <TouchableOpacity
         style={styles.button}
         onPress={() => {
-          startService()
+          startService(serviceConfig)
             .then((res) => {
               console.log(res, 'response');
             })

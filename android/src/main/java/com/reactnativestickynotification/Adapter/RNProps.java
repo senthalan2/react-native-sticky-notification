@@ -5,8 +5,7 @@ public enum RNProps {
 
 
   DISPLAY_TEXTS("displayTexts"),
-  CHANNEL_ID("channelId"),
-  CHANNEL_NAME("channelName"),
+  DISPLAY_ICONS("displayIcons"),
   EXIT_ENABLED("exitEnabled"),
   ICON("icon");
   private String value;

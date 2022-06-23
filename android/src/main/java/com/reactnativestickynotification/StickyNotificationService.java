@@ -1,6 +1,8 @@
 package com.reactnativestickynotification;
 
 import static com.reactnativestickynotification.StickyNotificationModule.CHANNEL_ID;
+import static com.reactnativestickynotification.StickyNotificationModule.ICONS_LIST;
+import static com.reactnativestickynotification.StickyNotificationModule.promise;
 import static com.reactnativestickynotification.StickyNotificationModule.props;
 
 
@@ -10,6 +12,8 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.IBinder;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -26,12 +30,6 @@ public class StickyNotificationService extends Service{
 
     return null;
   }
-//
-//  @Override
-//  public void onCreate() {
-//    super.onCreate();
-//
-//  }
 
   @Override
   public void onDestroy() {
@@ -158,25 +156,54 @@ public class StickyNotificationService extends Service{
       for(int i =0;i<props.displayTexts().length;i++){
         notificationLayout.setTextViewText(integer[i],StickyNotificationModule.props.displayTexts()[i]);
       }
+      try{
+        for(int i=0;i<props.displayIcons().size();i++){
+          if(i< props.iconsCount()){
+            notificationLayout.setImageViewResource(getSourceIconID(i),ICONS_LIST.get(Integer.parseInt(props.displayIcons().get(i))));
+          }
+        }
+      }
+      catch (Exception e){
+        promise.reject("SERVICE_NOT_STARTED",e.getMessage());
+      }
 
-      if(props.buttonsCount()==4){
+      if(props.buttonsCount()==5){
+        notificationLayout.setViewVisibility(R.id.b5, View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b4,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b3,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b2,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b1,View.VISIBLE);
+      }
+     else if(props.buttonsCount()==4){
         notificationLayout.setViewVisibility(R.id.b5, View.GONE);
+        notificationLayout.setViewVisibility(R.id.b4,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b3,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b2,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b1,View.VISIBLE);
       }
       else if(props.buttonsCount()==3){
+
         notificationLayout.setViewVisibility(R.id.b5,View.GONE);
         notificationLayout.setViewVisibility(R.id.b4,View.GONE);
+        notificationLayout.setViewVisibility(R.id.b3,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b2,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b1,View.VISIBLE);
       }
       else if(props.buttonsCount()==2){
         notificationLayout.setViewVisibility(R.id.b5,View.GONE);
         notificationLayout.setViewVisibility(R.id.b4,View.GONE);
         notificationLayout.setViewVisibility(R.id.b3,View.GONE);
+        notificationLayout.setViewVisibility(R.id.b2,View.VISIBLE);
+        notificationLayout.setViewVisibility(R.id.b1,View.VISIBLE);
       }
 
       else if(props.buttonsCount()==1){
+
         notificationLayout.setViewVisibility(R.id.b5,View.GONE);
         notificationLayout.setViewVisibility(R.id.b4,View.GONE);
         notificationLayout.setViewVisibility(R.id.b3,View.GONE);
         notificationLayout.setViewVisibility(R.id.b2,View.GONE);
+        notificationLayout.setViewVisibility(R.id.b1,View.VISIBLE);
 
       }
 
@@ -231,6 +258,7 @@ else if(props.icon().equals("other")){
 
     startForeground(1, notification);
 
+
   }
 
   public void exit(int position){
@@ -240,6 +268,35 @@ else if(props.icon().equals("other")){
       stopSelf();
     }
   }
+
+
+  public static Bitmap getDefaultAlbumArt(Context context, int resId) {
+    Bitmap bm = null;
+    try {
+      bm = BitmapFactory.decodeResource(context.getResources(), resId, new BitmapFactory.Options());
+    } catch (Error e) {
+    } catch (Exception e2) {
+    }
+    return bm;
+  }
+
+  int getSourceIconID(int index){
+    if(index == 0){
+      return R.id.icon_1;
+    }
+    else  if(index == 1){
+      return R.id.icon_2;
+    }
+    else  if(index == 2){
+      return R.id.icon_3;
+    }
+    else  if(index == 3){
+      return R.id.icon_4;
+    }
+      return R.id.icon_5;
+
+  }
+
   private Class getMainActivityClass(Context context) {
     String packageName = context.getPackageName();
     Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
