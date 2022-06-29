@@ -47,8 +47,8 @@ export const createChannel = ({
       reject('Channel Name is required!');
     } else if (typeof channelName != 'string') {
       reject('Channel Name must be String!');
-    } else if (totalProcessCount > 20) {
-      reject('Total Process Count must be less than or equal to 20!');
+    } else if (totalProcessCount > 40) {
+      reject('Total Process Count must be less than or equal to 40!');
     } else if (totalProcessCount <= 0) {
       reject('Total Process Count must be greater than 0!');
     } else {

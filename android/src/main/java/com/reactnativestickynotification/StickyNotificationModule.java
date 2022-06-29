@@ -198,7 +198,67 @@ public class StickyNotificationModule extends ReactContextBaseJavaModule {
     else  if(index == 18){
       return R.drawable.img19;
     }
-    return R.drawable.img20;
+    else if(index == 19){
+      return R.drawable.img20;
+    }
+    else if(index == 20){
+      return R.drawable.img21;
+    }
+    else  if(index == 21){
+      return R.drawable.img22;
+    }
+    else  if(index == 22){
+      return R.drawable.img23;
+    }
+    else  if(index == 23){
+      return R.drawable.img24;
+    }
+    else  if(index == 24){
+      return R.drawable.img25;
+    }
+    else  if(index == 25){
+      return R.drawable.img26;
+    }
+    else  if(index == 26){
+      return R.drawable.img27;
+    }
+    else  if(index == 27){
+      return R.drawable.img28;
+    }
+    else  if(index == 28){
+      return R.drawable.img29;
+    }
+    else  if(index == 29){
+      return R.drawable.img30;
+    }
+    else  if(index == 30){
+      return R.drawable.img31;
+    }
+    else  if(index == 31){
+      return R.drawable.img32;
+    }
+    else  if(index == 32){
+      return R.drawable.img33;
+    }
+    else  if(index == 33){
+      return R.drawable.img34;
+    }
+    else  if(index == 34){
+      return R.drawable.img35;
+    }
+    else  if(index == 35){
+      return R.drawable.img36;
+    }
+    else  if(index == 36){
+      return R.drawable.img37;
+    }
+    else  if(index == 37){
+      return R.drawable.img38;
+    }
+    else  if(index == 38){
+      return R.drawable.img39;
+    }
+    return R.drawable.img40;
   }
 
 

@@ -1,6 +1,6 @@
 {
   "name": "react-native-sticky-notification",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Customizable Sticky Notification for Android",
   "main": "src/index.js",
   "module": "lib/module/index",

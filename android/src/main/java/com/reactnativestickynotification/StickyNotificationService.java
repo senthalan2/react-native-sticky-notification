@@ -164,7 +164,7 @@ public class StickyNotificationService extends Service{
         }
       }
       catch (Exception e){
-        promise.reject("SERVICE_NOT_STARTED",e.getMessage());
+        promise.reject("ICONS_ERROR",e.getMessage());
       }
 
       if(props.buttonsCount()==5){

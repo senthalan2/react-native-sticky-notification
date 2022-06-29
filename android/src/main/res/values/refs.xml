@@ -72,6 +72,68 @@
   <item type="drawable" name="img20">
     @drawable/img20
   </item>
+  <item type="drawable" name="img21">
+    @drawable/img21
+  </item>
+  <item type="drawable" name="img22">
+    @drawable/img22
+  </item>
+  <item type="drawable" name="img23">
+    @drawable/img23
+  </item>
+  <item type="drawable" name="img24">
+    @drawable/img24
+  </item>
+  <item type="drawable" name="img25">
+    @drawable/img25
+  </item>
+  <item type="drawable" name="img26">
+    @drawable/img26
+  </item>
+  <item type="drawable" name="img27">
+    @drawable/img27
+  </item>
+  <item type="drawable" name="img28">
+    @drawable/img28
+  </item>
+  <item type="drawable" name="img29">
+    @drawable/img29
+  </item>
+  <item type="drawable" name="img30">
+    @drawable/img30
+  </item>
+  <item type="drawable" name="img31">
+    @drawable/img31
+  </item>
+  <item type="drawable" name="img32">
+    @drawable/img32
+  </item>
+  <item type="drawable" name="img33">
+    @drawable/img33
+  </item>
+  <item type="drawable" name="img34">
+    @drawable/img34
+  </item>
+  <item type="drawable" name="img35">
+    @drawable/img35
+  </item>
+  <item type="drawable" name="img36">
+    @drawable/img36
+  </item>
+  <item type="drawable" name="img37">
+    @drawable/img37
+  </item>
+  <item type="drawable" name="img38">
+    @drawable/img38
+  </item>
+  <item type="drawable" name="img39">
+    @drawable/img39
+  </item>
+  <item type="drawable" name="img40">
+    @drawable/img40
+  </item>
+
+
 
   <item type="id" name="b1">
     @id/b1

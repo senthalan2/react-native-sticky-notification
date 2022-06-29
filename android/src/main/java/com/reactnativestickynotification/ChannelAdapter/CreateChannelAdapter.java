@@ -45,11 +45,11 @@ public class CreateChannelAdapter implements CreateChannelProps{
   private int getTotalCount() {
 
     if(props.hasKey(ChannelProps.TOTAL_PROCESS_BUTTONS_COUNT.value())){
-      if( props.getInt(ChannelProps.TOTAL_PROCESS_BUTTONS_COUNT.value()) <= 20 && props.getInt(ChannelProps.TOTAL_PROCESS_BUTTONS_COUNT.value()) > 0){
+      if( props.getInt(ChannelProps.TOTAL_PROCESS_BUTTONS_COUNT.value()) <= 40 && props.getInt(ChannelProps.TOTAL_PROCESS_BUTTONS_COUNT.value()) > 0){
         return props.getInt(ChannelProps.TOTAL_PROCESS_BUTTONS_COUNT.value());
       }
-      return 20;
+      return 40;
     }
-    return 20;
+    return 40;
   }
 }
