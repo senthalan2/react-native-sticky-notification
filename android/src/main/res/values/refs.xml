@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <item type="layout" name="notification_panel">
+    @layout/notification_panel
+  </item>
+  <item type="mipmap" name="ic_launcher">
+    @mipmap/ic_launcher
+  </item>
+  <item type="mipmap" name="ic_launcher_round">
+    @mipmap/ic_launcher_round
+  </item>
+  <item type="drawable" name="notification_icon">
+    @drawable/notification_icon
+  </item>
+  <item type="drawable" name="img1">
+    @drawable/img1
+  </item>
+  <item type="drawable" name="img2">
+    @drawable/img2
+  </item>
+  <item type="drawable" name="img3">
+    @drawable/img3
+  </item>
+  <item type="drawable" name="img4">
+    @drawable/img4
+  </item>
+  <item type="drawable" name="img5">
+    @drawable/img5
+  </item>
+  <item type="drawable" name="img6">
+    @drawable/img6
+  </item>
+  <item type="drawable" name="img7">
+    @drawable/img7
+  </item>
+  <item type="drawable" name="img8">
+    @drawable/img8
+  </item>
+  <item type="drawable" name="img9">
+    @drawable/img9
+  </item>
+  <item type="drawable" name="img10">
+    @drawable/img10
+  </item>
+  <item type="drawable" name="img11">
+    @drawable/img11
+  </item>
+  <item type="drawable" name="img12">
+    @drawable/img12
+  </item>
+  <item type="drawable" name="img13">
+    @drawable/img13
+  </item>
+  <item type="drawable" name="img14">
+    @drawable/img14
+  </item>
+  <item type="drawable" name="img15">
+    @drawable/img15
+  </item>
+  <item type="drawable" name="img16">
+    @drawable/img16
+  </item>
+  <item type="drawable" name="img17">
+    @drawable/img17
+  </item>
+  <item type="drawable" name="img18">
+    @drawable/img18
+  </item>
+  <item type="drawable" name="img19">
+    @drawable/img19
+  </item>
+  <item type="drawable" name="img20">
+    @drawable/img20
+  </item>
+  <item type="drawable" name="img21">
+    @drawable/img21
+  </item>
+  <item type="drawable" name="img22">
+    @drawable/img22
+  </item>
+  <item type="drawable" name="img23">
+    @drawable/img23
+  </item>
+  <item type="drawable" name="img24">
+    @drawable/img24
+  </item>
+  <item type="drawable" name="img25">
+    @drawable/img25
+  </item>
+  <item type="drawable" name="img26">
+    @drawable/img26
+  </item>
+  <item type="drawable" name="img27">
+    @drawable/img27
+  </item>
+  <item type="drawable" name="img28">
+    @drawable/img28
+  </item>
+  <item type="drawable" name="img29">
+    @drawable/img29
+  </item>
+  <item type="drawable" name="img30">
+    @drawable/img30
+  </item>
+  <item type="drawable" name="img31">
+    @drawable/img31
+  </item>
+  <item type="drawable" name="img32">
+    @drawable/img32
+  </item>
+  <item type="drawable" name="img33">
+    @drawable/img33
+  </item>
+  <item type="drawable" name="img34">
+    @drawable/img34
+  </item>
+  <item type="drawable" name="img35">
+    @drawable/img35
+  </item>
+  <item type="drawable" name="img36">
+    @drawable/img36
+  </item>
+  <item type="drawable" name="img37">
+    @drawable/img37
+  </item>
+  <item type="drawable" name="img38">
+    @drawable/img38
+  </item>
+  <item type="drawable" name="img39">
+    @drawable/img39
+  </item>
+  <item type="drawable" name="img40">
+    @drawable/img40
+  </item>
+  <item type="drawable" name="img41">
+    @drawable/img41
+  </item>
+  <item type="drawable" name="img42">
+    @drawable/img42
+  </item>
+  <item type="drawable" name="img43">
+    @drawable/img43
+  </item>
+  <item type="drawable" name="img44">
+    @drawable/img44
+  </item>
+  <item type="drawable" name="img45">
+    @drawable/img45
+  </item>
+  <item type="drawable" name="img46">
+    @drawable/img46
+  </item>
+  <item type="drawable" name="img47">
+    @drawable/img47
+  </item>
+  <item type="drawable" name="img48">
+    @drawable/img48
+  </item>
+  <item type="drawable" name="img49">
+    @drawable/img49
+  </item>
+  <item type="drawable" name="img50">
+    @drawable/img50
+  </item>
+  <item type="drawable" name="img51">
+    @drawable/img51
+  </item>
+  <item type="drawable" name="img52">
+    @drawable/img52
+  </item>
+  <item type="drawable" name="img53">
+    @drawable/img53
+  </item>
+  <item type="drawable" name="img54">
+    @drawable/img54
+  </item>
+  <item type="drawable" name="img55">
+    @drawable/img55
+  </item>
+  <item type="drawable" name="img56">
+    @drawable/img56
+  </item>
+  <item type="drawable" name="img57">
+    @drawable/img57
+  </item>
+  <item type="drawable" name="img58">
+    @drawable/img58
+  </item>
+  <item type="drawable" name="img59">
+    @drawable/img59
+  </item>
+  <item type="drawable" name="img60">
+    @drawable/img60
+  </item>
+
+
+
+
+  <item type="id" name="b1">
+    @id/b1
+  </item>
+  <item type="id" name="b2">
+    @id/b2
+  </item>
+  <item type="id" name="b3">
+    @id/b3
+  </item>
+  <item type="id" name="b4">
+    @id/b4
+  </item>
+  <item type="id" name="b5">
+    @id/b5
+  </item>
+
+  <item type="id" name="icon_1">
+    @id/icon_1
+  </item>
+  <item type="id" name="icon_2">
+    @id/icon_2
+  </item>
+  <item type="id" name="icon_3">
+    @id/icon_3
+  </item>
+  <item type="id" name="icon_4">
+    @id/icon_4
+  </item>
+  <item type="id" name="icon_5">
+    @id/icon_5
+  </item>
+
+  <item type="id" name="t1">
+    @id/t1
+  </item>
+  <item type="id" name="t2">
+    @id/t2
+  </item>
+  <item type="id" name="t3">
+    @id/t3
+  </item>
+  <item type="id" name="t4">
+    @id/t4
+  </item>
+  <item type="id" name="t5">
+    @id/t5
+  </item>
+
+
+
+</resources>
