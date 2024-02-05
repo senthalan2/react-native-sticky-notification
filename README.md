@@ -28,7 +28,7 @@ Go to your `android/app/src/main/AndroidManifest.xml` and then Register Service 
 
 <application>
     ....
-    <service android:name="com.stickynotification.StickyNotificationService" android:enabled="true"/>   <!--   Add this   -->
+   <service android:name="com.stickynotification.StickyNotificationService" android:enabled="true" android:foregroundServiceType="shortService"/>   <!--   Add this   -->
 </application>
 ```
 
