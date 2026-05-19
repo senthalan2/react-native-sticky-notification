@@ -316,7 +316,7 @@ StickyNotification.addActionListener(({ actionId }) => {
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `title` | `string` | **Required** | Bold title line. |
+| `title` | `string` | — | Bold title line. Hidden automatically when absent or empty — no blank gap. |
 | `text` | `string` | — | Body text. Hidden automatically when absent or empty — no blank gap. |
 | `subText` | `string` | — | Smaller sub-text below the body. Hidden when absent or empty. |
 
@@ -416,7 +416,7 @@ interface StickyNotificationOptions {
   notificationId?: number;
 
   // Content
-  title: string;                 // Required
+  title?: string;
   text?: string;
   subText?: string;
 

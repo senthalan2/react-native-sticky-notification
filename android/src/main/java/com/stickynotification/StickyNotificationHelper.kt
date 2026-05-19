@@ -94,7 +94,7 @@ object StickyNotificationHelper {
     val channelName = config.getString("channelName") ?: DEFAULT_CHANNEL_NAME
     ensureChannelExists(context, channelId, channelName, config)
 
-    val title = config.getString("title") ?: ""
+    val title = config.getString("title")
     val text = config.getString("text")
     val subText = config.getString("subText")
     val smallIconName = config.getString("smallIcon")
@@ -135,7 +135,6 @@ object StickyNotificationHelper {
     )
 
     val builder = NotificationCompat.Builder(context, channelId)
-      .setContentTitle(title)
       .setSmallIcon(smallIconRes)
       .setOngoing(ongoing)
       .setAutoCancel(autoCancel)
@@ -146,6 +145,7 @@ object StickyNotificationHelper {
       .setContentIntent(buildLaunchPendingIntent(context))
       .apply { if (repostOnDismiss) setDeleteIntent(buildRepostPendingIntent(context)) }
 
+    if (!title.isNullOrEmpty()) builder.setContentTitle(title)
     if (!text.isNullOrEmpty()) builder.setContentText(text)
     subText?.let { builder.setSubText(it) }
     colorHex?.let { hex -> runCatching { builder.setColor(Color.parseColor(hex)) } }
@@ -160,7 +160,7 @@ object StickyNotificationHelper {
 
   private fun buildBigContentView(
     context: Context,
-    title: String,
+    title: String?,
     text: String?,
     subText: String?,
     actions: ArrayList<Bundle>?,
@@ -173,9 +173,14 @@ object StickyNotificationHelper {
     val pkg = context.packageName
     val views = RemoteViews(pkg, R.layout.notification_panel)
 
-    // ── Title ─────────────────────────────────────────────────────────────
-    views.setTextViewText(R.id.notification_title, title)
-    style.titleColor?.let { views.setTextColor(R.id.notification_title, it) }
+    // ── Title (hidden when null or empty) ────────────────────────────────
+    if (!title.isNullOrEmpty()) {
+      views.setViewVisibility(R.id.notification_title, View.VISIBLE)
+      views.setTextViewText(R.id.notification_title, title)
+      style.titleColor?.let { views.setTextColor(R.id.notification_title, it) }
+    } else {
+      views.setViewVisibility(R.id.notification_title, View.GONE)
+    }
 
     // ── Body text (hidden when null or empty) ─────────────────────────────
     if (!text.isNullOrEmpty()) {

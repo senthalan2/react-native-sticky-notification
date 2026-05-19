@@ -63,8 +63,11 @@ export interface StickyNotificationOptions {
   notificationId?: number;
 
   // ── Content ──────────────────────────────────────────────────────────────
-  /** Bold title line (required). */
-  title: string;
+  /**
+   * Bold title line.
+   * Hidden automatically when absent or empty — no blank gap above the body text.
+   */
+  title?: string;
   /**
    * Body text shown below the title.
    * Hidden automatically when absent or empty — no blank-line artefact.
