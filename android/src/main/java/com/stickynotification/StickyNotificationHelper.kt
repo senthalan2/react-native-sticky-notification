@@ -119,7 +119,7 @@ object StickyNotificationHelper {
       actionLabelColor = parseColor(config.getString("actionLabelColor")),
       actionIconTint = parseColor(config.getString("actionIconTint")),
       actionBackground = parseColor(config.getString("actionBackground")),
-      actionBorderRadius = config.getFloat("actionBorderRadius", 0f).coerceAtLeast(0f),
+      actionBorderRadius = (config.get("actionBorderRadius") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
       actionsContainerBackground = parseColor(config.getString("actionsContainerBackground")),
     )
 
@@ -232,8 +232,9 @@ object StickyNotificationHelper {
         val btnLabelColor  = parseColor(actionBundle.getString("labelColor"))  ?: style.actionLabelColor
         val btnIconTint    = parseColor(actionBundle.getString("iconTint"))     ?: style.actionIconTint
         val btnBackground  = parseColor(actionBundle.getString("background"))   ?: style.actionBackground
-        val btnRadius      = actionBundle.getFloat("borderRadius", -1f)
-          .let { if (it < 0f) style.actionBorderRadius else it }
+        val btnRadius      = (actionBundle.get("borderRadius") as? Number)?.toFloat()
+          ?.let { if (it < 0f) style.actionBorderRadius else it }
+          ?: style.actionBorderRadius
 
         val buttonView = RemoteViews(pkg, R.layout.notification_action_button)
 

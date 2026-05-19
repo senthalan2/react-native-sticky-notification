@@ -1,7 +1,7 @@
 {
   "name": "react-native-sticky-notification",
-  "version": "0.1.0",
-  "description": "Customizable Sticky Notification for Android, that contains maximum of five clickable buttons. This act as a Service in android. You have to use the buttons respectively for any operataions in your react native project.",
+  "version": "1.5.0",
+  "description": "Android foreground-service sticky notification with unlimited action buttons, full styling control, and reliable JS event delivery across all app states — New Architecture ready",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
