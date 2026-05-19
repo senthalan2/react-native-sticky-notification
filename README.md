@@ -198,7 +198,37 @@ StickyNotification.startService({
 });
 ```
 
-### 3. Open App & Close Panel on Button Tap
+### 3. Buttons in Both Collapsed and Expanded Views
+
+```ts
+StickyNotification.startService({
+  title: 'Music Player',
+  text: 'Now playing: Awesome Song',
+  smallIcon: 'ic_notification',
+  color: '#1DB954',
+
+  // Collapsed view — 3 icon-only buttons (fits within the ~64 dp height cap)
+  collapsedActions: [
+    { id: 'prev',  title: 'Prev',  icon: 'ic_skip_previous' },
+    { id: 'pause', title: 'Pause', icon: 'ic_pause'         },
+    { id: 'next',  title: 'Next',  icon: 'ic_skip_next'     },
+  ],
+  showLabelsInCollapsed: false,  // icon-only in collapsed (default)
+
+  // Expanded view — same or richer set of actions
+  actions: [
+    { id: 'prev',    title: 'Prev',     icon: 'ic_skip_previous' },
+    { id: 'pause',   title: 'Pause',    icon: 'ic_pause'         },
+    { id: 'next',    title: 'Next',     icon: 'ic_skip_next'     },
+    { id: 'shuffle', title: 'Shuffle',  icon: 'ic_shuffle'       },
+    { id: 'repeat',  title: 'Repeat',   icon: 'ic_repeat'        },
+  ],
+});
+```
+
+> **Tip**: Pass the same `actions` array to both `collapsedActions` and `actions` if you want identical buttons in both states. Pass a subset (e.g. 3 out of 5) to keep the collapsed view compact.
+
+### 4. Open App & Close Panel on Button Tap
 
 ```ts
 StickyNotification.startService({
@@ -345,9 +375,29 @@ StickyNotification.addActionListener(({ actionId }) => {
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `actions` | `NotificationAction[]` | — | Interactive buttons displayed in the notification panel. No hard limit. |
+| `actions` | `NotificationAction[]` | — | Interactive buttons displayed in the **expanded** notification panel. No hard limit. |
 | `buttonsPerRow` | `number` | `5` | Action buttons per row. Reduce for wider buttons with longer labels. Minimum: 1. |
 | `maxButtons` | `number` | `0` (no cap) | Maximum total buttons to display. Buttons beyond this count are silently hidden. |
+
+### 📲 Collapsed View Buttons
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `collapsedActions` | `NotificationAction[]` | — | Buttons to show in the **collapsed** (non-expanded) notification. When omitted, the collapsed view shows Android's standard title + text template. See limitations below. |
+| `showLabelsInCollapsed` | `boolean` | `false` | Show text labels below icons in the collapsed buttons. Disabled by default to fit within Android's ~64 dp collapsed height cap. Enable only with ≤ 2 buttons or icon-less buttons. |
+
+> **Collapsed view limitations**
+> - Android enforces a ~64 dp height cap on the collapsed notification — content beyond that is clipped.
+> - **Recommended: ≤ 3 buttons, icon-only** (`showLabelsInCollapsed: false`).
+> - The same `openAppOnAction`, `closeOnAction`, `actionSpacing`, and per-button colour overrides apply to collapsed buttons.
+> - When `collapsedActions` is set and `title` is also set, the title appears above the button row inside the collapsed view.
+
+### 🗂️ Container Styling
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `containerBackground` | `string` | None | Hex background colour for the entire notification panel, e.g. `"#1A1A1A"` for a dark card. |
+| `containerBorderRadius` | `number` | `0` | Corner radius in dp for the notification panel. Requires `containerBackground` to be visible. On Android 12+ (API 31) the content is clipped to rounded corners; on older versions the colour is applied but corners remain square. |
 
 ### 🎨 Divider Styling
 
@@ -438,10 +488,14 @@ interface StickyNotificationOptions {
   openAppOnAction?: boolean;
   closeOnAction?: boolean;
 
-  // Button layout
+  // Button layout (expanded view)
   actions?: NotificationAction[];
   buttonsPerRow?: number;
   maxButtons?: number;
+
+  // Collapsed view buttons
+  collapsedActions?: NotificationAction[];
+  showLabelsInCollapsed?: boolean;
 
   // Divider
   showDivider?: boolean;
@@ -451,6 +505,10 @@ interface StickyNotificationOptions {
   titleColor?: string;
   textColor?: string;
   subTextColor?: string;
+
+  // Container styling
+  containerBackground?: string;
+  containerBorderRadius?: number;
 
   // Action button styling (global)
   actionLabelColor?: string;

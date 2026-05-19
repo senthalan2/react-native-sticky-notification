@@ -75,6 +75,7 @@ object StickyNotificationHelper {
   // ─── Styling holder ────────────────────────────────────────────────────
 
   private data class Style(
+    val showLabelsInCollapsed: Boolean,
     val showDivider: Boolean,
     val dividerColor: Int?,
     val titleColor: Int?,
@@ -83,6 +84,8 @@ object StickyNotificationHelper {
     val actionLabelColor: Int?,
     val actionIconTint: Int?,
     val actionBackground: Int?,
+    val containerBackground: Int?,
+    val containerBorderRadius: Float,     // dp — corner radius for the whole panel
     val actionBorderRadius: Float,        // dp
     val actionSpacing: Float,             // dp — horizontal padding on each button
     val rowSpacing: Float,               // dp — vertical padding on each row
@@ -114,6 +117,7 @@ object StickyNotificationHelper {
     val maxButtons = config.getInt("maxButtons", 0)
 
     val style = Style(
+      showLabelsInCollapsed = if (config.containsKey("showLabelsInCollapsed")) config.getBoolean("showLabelsInCollapsed") else false,
       showDivider = if (config.containsKey("showDivider")) config.getBoolean("showDivider") else true,
       dividerColor = parseColor(config.getString("dividerColor")),
       titleColor = parseColor(config.getString("titleColor")),
@@ -122,6 +126,8 @@ object StickyNotificationHelper {
       actionLabelColor = parseColor(config.getString("actionLabelColor")),
       actionIconTint = parseColor(config.getString("actionIconTint")),
       actionBackground = parseColor(config.getString("actionBackground")),
+      containerBackground = parseColor(config.getString("containerBackground")),
+      containerBorderRadius = (config.get("containerBorderRadius") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
       actionBorderRadius = (config.get("actionBorderRadius") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
       actionSpacing = (config.get("actionSpacing") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
       rowSpacing = (config.get("rowSpacing") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
@@ -131,6 +137,9 @@ object StickyNotificationHelper {
 
     @Suppress("UNCHECKED_CAST")
     val actionsBundle: ArrayList<Bundle>? = config.getParcelableArrayList("actions")
+
+    @Suppress("UNCHECKED_CAST")
+    val collapsedActionsBundle: ArrayList<Bundle>? = config.getParcelableArrayList("collapsedActions")
 
     val smallIconRes = resolveDrawableResource(context, smallIconName)
       ?: context.applicationInfo.icon
@@ -149,6 +158,13 @@ object StickyNotificationHelper {
       .setCustomBigContentView(bigView)
       .setContentIntent(buildLaunchPendingIntent(context))
       .apply { if (repostOnDismiss) setDeleteIntent(buildRepostPendingIntent(context)) }
+
+    if (!collapsedActionsBundle.isNullOrEmpty()) {
+      val collapsedView = buildCollapsedView(
+        context, title, collapsedActionsBundle, openAppOnAction, closeOnAction, style
+      )
+      builder.setCustomContentView(collapsedView)
+    }
 
     if (!title.isNullOrEmpty()) builder.setContentTitle(title)
     if (!text.isNullOrEmpty()) builder.setContentText(text)
@@ -177,6 +193,21 @@ object StickyNotificationHelper {
   ): RemoteViews {
     val pkg = context.packageName
     val views = RemoteViews(pkg, R.layout.notification_panel)
+
+    // ── Container background & border radius ──────────────────────────────
+    style.containerBackground?.let {
+      views.setInt(R.id.notification_container, "setBackgroundColor", it)
+    }
+    if (style.containerBorderRadius > 0f) {
+      views.setBoolean(R.id.notification_container, "setClipToOutline", true)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        views.setViewOutlinePreferredRadius(
+          R.id.notification_container,
+          style.containerBorderRadius,
+          android.util.TypedValue.COMPLEX_UNIT_DIP,
+        )
+      }
+    }
 
     // ── Header container (hidden entirely when all text fields are empty) ─
     val hasAnyText = !title.isNullOrEmpty() || !text.isNullOrEmpty() || !subText.isNullOrEmpty()
@@ -306,6 +337,101 @@ object StickyNotificationHelper {
       }
 
       views.addView(R.id.buttons_container, rowView)
+    }
+
+    return views
+  }
+
+  // ─── Collapsed view builder ────────────────────────────────────────────
+
+  private fun buildCollapsedView(
+    context: Context,
+    title: String?,
+    actions: ArrayList<Bundle>,
+    openAppOnAction: Boolean,
+    closeOnAction: Boolean,
+    style: Style,
+  ): RemoteViews {
+    val pkg = context.packageName
+    val views = RemoteViews(pkg, R.layout.notification_collapsed)
+
+    // Optional title above the buttons
+    if (!title.isNullOrEmpty()) {
+      views.setViewVisibility(R.id.collapsed_title, View.VISIBLE)
+      views.setTextViewText(R.id.collapsed_title, title)
+      style.titleColor?.let { views.setTextColor(R.id.collapsed_title, it) }
+    } else {
+      views.setViewVisibility(R.id.collapsed_title, View.GONE)
+    }
+
+    val density = context.resources.displayMetrics.density
+
+    actions.forEach actionLoop@{ actionBundle ->
+      val actionId = actionBundle.getString("id") ?: return@actionLoop
+      val actionTitle = actionBundle.getString("title") ?: actionId
+      val iconName = actionBundle.getString("icon")
+      val payload = actionBundle.getString("payload")
+
+      val btnLabelColor = parseColor(actionBundle.getString("labelColor")) ?: style.actionLabelColor
+      val btnIconTint   = parseColor(actionBundle.getString("iconTint"))   ?: style.actionIconTint
+      val btnBackground = parseColor(actionBundle.getString("background")) ?: style.actionBackground
+      val btnRadius     = (actionBundle.get("borderRadius") as? Number)?.toFloat()
+        ?.let { if (it < 0f) style.actionBorderRadius else it }
+        ?: style.actionBorderRadius
+
+      val buttonView = RemoteViews(pkg, R.layout.notification_action_button)
+
+      if (style.actionSpacing > 0f) {
+        val spacePx = (style.actionSpacing * density).toInt()
+        buttonView.setViewPadding(R.id.action_button, spacePx, 0, spacePx, 0)
+      }
+
+      if (btnBackground != null || btnRadius > 0f) {
+        val bitmapH = (48 * density).toInt().coerceAtLeast(1)
+        val bitmapW = (200 * density).toInt().coerceAtLeast(1)
+        val bgBitmap = buildRoundedBitmap(
+          color = btnBackground ?: Color.TRANSPARENT,
+          cornerRadius = btnRadius * density,
+          width = bitmapW,
+          height = bitmapH,
+        )
+        buttonView.setViewVisibility(R.id.action_bg, View.VISIBLE)
+        buttonView.setImageViewBitmap(R.id.action_bg, bgBitmap)
+      } else {
+        buttonView.setViewVisibility(R.id.action_bg, View.GONE)
+      }
+
+      val iconRes = resolveDrawableResource(context, iconName)
+      if (iconRes != null) {
+        buttonView.setViewVisibility(R.id.action_icon, View.VISIBLE)
+        buttonView.setImageViewResource(R.id.action_icon, iconRes)
+        btnIconTint?.let { buttonView.setInt(R.id.action_icon, "setColorFilter", it) }
+        // In collapsed mode hide the label when showLabelsInCollapsed is false
+        if (style.showLabelsInCollapsed) {
+          buttonView.setViewVisibility(R.id.action_text, View.VISIBLE)
+          buttonView.setTextViewText(R.id.action_text, actionTitle)
+          btnLabelColor?.let { buttonView.setTextColor(R.id.action_text, it) }
+          val iconSpacePx = (style.actionIconSpacing * density).toInt()
+          buttonView.setViewPadding(R.id.action_text, 0, iconSpacePx, 0, 0)
+        } else {
+          buttonView.setViewVisibility(R.id.action_text, View.GONE)
+        }
+      } else {
+        // No icon — always show the label so the button is not empty
+        buttonView.setViewVisibility(R.id.action_icon, View.GONE)
+        buttonView.setViewVisibility(R.id.action_text, View.VISIBLE)
+        buttonView.setTextViewText(R.id.action_text, actionTitle)
+        btnLabelColor?.let { buttonView.setTextColor(R.id.action_text, it) }
+      }
+
+      val pendingIntent = if (closeOnAction || openAppOnAction) {
+        buildTrampolinePendingIntent(context, actionId, payload, openAppOnAction)
+      } else {
+        buildActionPendingIntent(context, actionId, payload)
+      }
+      buttonView.setOnClickPendingIntent(R.id.action_button, pendingIntent)
+
+      views.addView(R.id.collapsed_buttons, buttonView)
     }
 
     return views

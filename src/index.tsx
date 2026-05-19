@@ -157,6 +157,31 @@ export interface StickyNotificationOptions {
    * RemoteViews layout, bypassing Android's standard 3-action cap.
    */
   actions?: NotificationAction[];
+  /**
+   * Action buttons to display in the **collapsed** (non-expanded) notification.
+   *
+   * When provided, the collapsed view is replaced with a compact row of these
+   * buttons. When omitted, the collapsed view shows Android's standard
+   * title + text template (default behaviour).
+   *
+   * **Limitations**:
+   * - Android caps the collapsed notification height at ~64 dp. Exceeding 3
+   *   buttons or enabling labels may cause content to be clipped.
+   * - Recommended: ≤ 3 icon-only buttons.
+   * - Labels are hidden by default; set `showLabelsInCollapsed: true` to show them.
+   */
+  collapsedActions?: NotificationAction[];
+  /**
+   * Show text labels below icons in the collapsed notification buttons.
+   *
+   * Labels are hidden by default in collapsed mode to fit within the ~64 dp
+   * height limit. Enable this only when using ≤ 2 buttons or when buttons
+   * have no icons.
+   *
+   * Has no effect when `collapsedActions` is not provided.
+   * Default: false.
+   */
+  showLabelsInCollapsed?: boolean;
 
   // ── Divider ───────────────────────────────────────────────────────────────
   /**
@@ -179,6 +204,21 @@ export interface StickyNotificationOptions {
   textColor?: string;
   /** Hex colour for the sub-text. */
   subTextColor?: string;
+
+  // ── Container styling ────────────────────────────────────────────────────
+  /**
+   * Hex background colour for the entire notification panel.
+   * Example: "#1A1A1A" for a dark panel.
+   */
+  containerBackground?: string;
+  /**
+   * Corner radius for the notification panel background, in dp.
+   * Requires `containerBackground` to be set for the rounding to be visible.
+   * On Android 12+ (API 31) the corners are clipped; on older versions the
+   * background colour is applied but corners remain square.
+   * Default: 0.
+   */
+  containerBorderRadius?: number;
 
   // ── Action button styling ─────────────────────────────────────────────────
   /**

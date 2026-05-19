@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Compact layout for the collapsed (non-expanded) notification view.
+  Shown when collapsedActions is provided; replaces Android's default
+  title+text collapsed template with a row of action buttons.
+
+  IDs used by StickyNotificationHelper:
+    collapsed_title   – optional title above the buttons (gone when empty)
+    collapsed_buttons – horizontal container; buttons added via addView()
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/collapsed_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Shown only when a title is provided -->
+    <TextView
+        android:id="@+id/collapsed_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="2dp"
+        android:visibility="gone"
+        android:text="" />
+
+    <!-- Buttons added at runtime via RemoteViews.addView() -->
+    <LinearLayout
+        android:id="@+id/collapsed_buttons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:orientation="horizontal"
+        android:baselineAligned="false" />
+
+</LinearLayout>
