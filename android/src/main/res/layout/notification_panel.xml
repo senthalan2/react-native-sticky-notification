@@ -52,7 +52,12 @@
     </LinearLayout>
 
     <!-- ── Divider ─────────────────────────────────────────────────────── -->
-    <View
+    <!--
+      Plain <View> is NOT on the RemoteViews inflatable-class allowlist and
+      causes "Class not allowed to be inflated android.view.View".
+      <FrameLayout> is allowed and works identically as a colour-fill divider.
+    -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#33000000"
