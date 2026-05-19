@@ -1,6 +1,6 @@
 {
   "name": "react-native-sticky-notification",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "Android foreground-service sticky notification with unlimited action buttons, full styling control, and reliable JS event delivery across all app states — New Architecture ready",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",

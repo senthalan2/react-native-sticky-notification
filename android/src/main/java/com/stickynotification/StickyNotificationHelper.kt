@@ -579,7 +579,7 @@ object StickyNotificationHelper {
     // Letter colors applied last (highest priority — overrides word spans).
     // Targets the exact character position given by `index`.
     letterColors?.forEach { bundle ->
-      val idx   = bundle.getInt("index", -1)
+      val idx   = (bundle.get("index") as? Number)?.toInt() ?: -1
       val color = parseColor(bundle.getString("color")) ?: return@forEach
       if (idx in 0 until text.length) {
         spannable.setSpan(
