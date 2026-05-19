@@ -364,6 +364,7 @@ export interface ServiceStopEvent {
 
 const ACTION_PRESS_EVENT  = 'StickyNotification_onActionPress';
 const SERVICE_STOP_EVENT  = 'StickyNotification_onServiceStop';
+const SERVICE_START_EVENT = 'StickyNotification_onServiceStart';
 
 // DeviceEventEmitter is used instead of NativeEventEmitter(module) for two reasons:
 //  1. NativeEventEmitter forces the TurboModule to load at import time, which can
@@ -460,6 +461,34 @@ export const StickyNotification = {
    * sub.remove();
    * ```
    */
+  /**
+   * Subscribe to the notification-visible event.
+   *
+   * The callback fires once `startForeground()` has completed inside the
+   * Android service, meaning the notification is now actually displayed to
+   * the user. This is useful when there is a delay between calling
+   * `startService()` and the notification appearing — for example when
+   * requesting the `POST_NOTIFICATIONS` permission first, or when the
+   * service takes time to initialise.
+   *
+   * Returns an `EmitterSubscription` — call `.remove()` on unmount.
+   *
+   * @example
+   * ```ts
+   * const sub = StickyNotification.addServiceStartListener(() => {
+   *   console.log('Notification is now visible');
+   * });
+   * // later:
+   * sub.remove();
+   * ```
+   */
+  addServiceStartListener(callback: () => void): EmitterSubscription {
+    if (Platform.OS !== 'android') {
+      return { remove: () => {} } as EmitterSubscription;
+    }
+    return DeviceEventEmitter.addListener(SERVICE_START_EVENT, callback);
+  },
+
   addActionListener(
     callback: (event: ActionPressEvent) => void
   ): EmitterSubscription {
@@ -500,10 +529,11 @@ export const StickyNotification = {
     );
   },
 
-  /** Remove all active action listeners and service-stop listeners at once. */
+  /** Remove all active listeners (action, service-start, service-stop) at once. */
   removeAllListeners(): void {
     if (Platform.OS === 'android') {
       DeviceEventEmitter.removeAllListeners(ACTION_PRESS_EVENT);
+      DeviceEventEmitter.removeAllListeners(SERVICE_START_EVENT);
       DeviceEventEmitter.removeAllListeners(SERVICE_STOP_EVENT);
     }
   },

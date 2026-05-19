@@ -181,6 +181,25 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
     false
   }
 
+  private fun handleServiceStarted() {
+    mainHandler.post {
+      // The bridge is always ready here — startService() was just called from JS.
+      // Try immediately; fall back to the drain queue if the bridge somehow isn't ready.
+      if (!tryEmitServiceStart()) {
+        mainHandler.postDelayed({ tryEmitServiceStart() }, INITIAL_DRAIN_DELAY_MS)
+      }
+    }
+  }
+
+  private fun tryEmitServiceStart(): Boolean = try {
+    reactApplicationContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      .emit(EVENT_SERVICE_START, null)
+    true
+  } catch (_: Exception) {
+    false
+  }
+
   // ─── Pending-event drain with retry ──────────────────────────────────────
 
   /**
@@ -284,8 +303,9 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
 
   companion object {
     const val NAME = "StickyNotification"
-    const val EVENT_ACTION_PRESS = "StickyNotification_onActionPress"
+    const val EVENT_ACTION_PRESS  = "StickyNotification_onActionPress"
     const val EVENT_SERVICE_STOP  = "StickyNotification_onServiceStop"
+    const val EVENT_SERVICE_START = "StickyNotification_onServiceStart"
 
     /**
      * Delay before first drain on resume.  Gives the New Architecture JS
@@ -329,6 +349,16 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
     fun notifyServiceStopped(reason: String): Boolean {
       val instance = currentInstance ?: return false
       instance.handleServiceStopped(reason)
+      return true
+    }
+
+    /**
+     * Called from StickyNotificationService after startForeground() succeeds,
+     * signalling that the notification is now visible to the user.
+     */
+    fun notifyServiceStarted(): Boolean {
+      val instance = currentInstance ?: return false
+      instance.handleServiceStarted()
       return true
     }
   }

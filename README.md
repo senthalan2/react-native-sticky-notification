@@ -14,7 +14,7 @@ A production-ready, fully typed, and deeply customizable React Native library fo
 
 - **Rock-Solid Event Delivery**: Action taps reach your JS listener whether the app is in the foreground, background, or was just cold-started from a killed state. Events are persisted in `SharedPreferences` and replayed on resume — zero taps are lost.
 
-- **Service Stop Events**: Get notified whenever the foreground service stops, regardless of the reason — explicit JS call (`MANUAL_STOP`), user swipe (`SWIPE_DISMISS`), or system kill (`SYSTEM_KILLED`). The same retry/queue mechanism used for action events ensures delivery even if the bridge wasn't ready at the moment of termination.
+- **Service Lifecycle Events**: Know exactly when the notification is visible (`addServiceStartListener`) and when the service stops for any reason (`addServiceStopListener` — `MANUAL_STOP`, `SWIPE_DISMISS`, or `SYSTEM_KILLED`). Useful for delayed starts, loading states, and teardown logic. The same retry/queue mechanism used for action events ensures delivery even across app states.
 
 - **New Architecture Ready**: Fully compatible with React Native 0.73+ TurboModules and the New Architecture. A deferred `Handler`-based drain with retry back-off ensures events are never emitted into an uninitialised bridge.
 
@@ -101,23 +101,29 @@ import StickyNotification from 'react-native-sticky-notification';
 import type { ActionPressEvent, ServiceStopEvent } from 'react-native-sticky-notification';
 
 export default function App() {
-  const actionSub  = useRef<{ remove: () => void } | null>(null);
-  const stopSub    = useRef<{ remove: () => void } | null>(null);
+  const actionSub = useRef<{ remove: () => void } | null>(null);
+  const startSub  = useRef<{ remove: () => void } | null>(null);
+  const stopSub   = useRef<{ remove: () => void } | null>(null);
 
   useEffect(() => {
-    // Listen for action button taps
-    actionSub.current = StickyNotification.addActionListener((event: ActionPressEvent) => {
-      console.log('Action pressed:', event.actionId, event.payload);
-      if (event.actionId === 'stop') StickyNotification.stopService();
+    // Fires once the notification is actually visible on screen
+    startSub.current = StickyNotification.addServiceStartListener(() => {
+      console.log('Notification is now visible');
     });
 
-    // Listen for service stop events
+    // Fires on every action button tap
+    actionSub.current = StickyNotification.addActionListener((event: ActionPressEvent) => {
+      console.log('Action pressed:', event.actionId, event.payload);
+    });
+
+    // Fires whenever the service stops for any reason
     stopSub.current = StickyNotification.addServiceStopListener((event: ServiceStopEvent) => {
       console.log('Service stopped, reason:', event.reason);
-      // event.reason is 'MANUAL_STOP' | 'SWIPE_DISMISS' | 'SYSTEM_KILLED'
+      // event.reason → 'MANUAL_STOP' | 'SWIPE_DISMISS' | 'SYSTEM_KILLED'
     });
 
     return () => {
+      startSub.current?.remove();
       actionSub.current?.remove();
       stopSub.current?.remove();
     };
@@ -438,6 +444,92 @@ export default function App() {
 
 > **Delivery guarantee** — `SWIPE_DISMISS` and `MANUAL_STOP` are delivered with the same retry/queue mechanism as action-press events. `SYSTEM_KILLED` is a best-effort delivery: if the module is available when `onDestroy` fires the event is emitted; if the entire process is being killed simultaneously the event may not reach JS in that run but will be queued for the next app launch.
 
+### 12. Service Start Listener — Know When the Notification Is Visible
+
+`startService()` resolves as soon as the start intent is dispatched, before the service has actually called `startForeground()`. Use `addServiceStartListener` to know the exact moment the notification appears on screen — useful for hiding loading spinners, enabling UI controls, or starting a timer only once the notification is confirmed visible.
+
+```tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Button, ActivityIndicator } from 'react-native';
+import StickyNotification from 'react-native-sticky-notification';
+
+export default function App() {
+  const [loading, setLoading] = useState(false);
+  const startSub = useRef<{ remove: () => void } | null>(null);
+
+  useEffect(() => {
+    startSub.current = StickyNotification.addServiceStartListener(() => {
+      // startForeground() has completed — notification is now on screen
+      setLoading(false);
+      console.log('Notification is now visible');
+    });
+
+    return () => startSub.current?.remove();
+  }, []);
+
+  const handleStart = async () => {
+    setLoading(true); // show spinner while service is starting
+
+    await StickyNotification.startService({
+      title: 'My Service',
+      text: 'Starting up…',
+      smallIcon: 'ic_notification',
+      actions: [{ id: 'stop', title: 'Stop', icon: 'ic_stop' }],
+    });
+    // Do NOT hide the spinner here — startService resolves before the
+    // notification is visible. The addServiceStartListener callback does that.
+  };
+
+  return (
+    <View>
+      {loading && <ActivityIndicator />}
+      <Button title="Start" onPress={handleStart} />
+      <Button title="Stop"  onPress={() => StickyNotification.stopService()} />
+    </View>
+  );
+}
+```
+
+### 13. canSwipeDismiss — Adapt to the Device
+
+Check at runtime whether the device allows foreground service notifications to be swiped away, then adapt your configuration and UI accordingly.
+
+```tsx
+import React, { useEffect } from 'react';
+import StickyNotification from 'react-native-sticky-notification';
+
+export default function App() {
+  useEffect(() => {
+    async function start() {
+      const dismissable = await StickyNotification.canSwipeDismiss();
+
+      await StickyNotification.startService({
+        title: 'My Service',
+        smallIcon: 'ic_notification',
+
+        // Only force-repost where the OS actually allows swipe dismissal (Android 14+).
+        // On older devices this flag has no effect, so setting it conditionally
+        // avoids unnecessary overhead.
+        repostOnDismiss: dismissable,
+
+        actions: [{ id: 'stop', title: 'Stop', icon: 'ic_stop' }],
+      });
+
+      if (dismissable) {
+        // Optionally inform the user that the notification can be swiped away
+        console.log('Running on Android 14+ — notification is swipe-dismissable');
+      }
+    }
+
+    start();
+  }, []);
+
+  // ...
+}
+```
+
+> **Returns `false` on iOS** and on Android 13 or below, where `ongoing: true` prevents swipe dismissal entirely.
+
 ---
 
 ## 📚 Methods
@@ -449,9 +541,10 @@ export default function App() {
 | `updateNotification(options)` | `Promise<void>` | Update notification content in-place. Supply only the keys you want to change. |
 | `isServiceRunning()` | `Promise<boolean>` | `true` when the service is active. Always `false` on iOS. |
 | `canSwipeDismiss()` | `Promise<boolean>` | `true` when the device runs Android 14+ (API 34), where foreground service notifications are swipe-dismissable regardless of the `ongoing` flag. Always `false` on iOS. |
+| `addServiceStartListener(callback)` | `EmitterSubscription` | Fires once `startForeground()` completes inside the service — i.e. the notification is now actually visible. Call `.remove()` on unmount. |
 | `addActionListener(callback)` | `EmitterSubscription` | Subscribe to action-button tap events. Call `.remove()` on unmount. |
 | `addServiceStopListener(callback)` | `EmitterSubscription` | Subscribe to service-stop events (`MANUAL_STOP`, `SWIPE_DISMISS`, `SYSTEM_KILLED`). Call `.remove()` on unmount. |
-| `removeAllListeners()` | `void` | Remove every active action listener and service-stop listener at once. |
+| `removeAllListeners()` | `void` | Remove every active listener (action, service-start, service-stop) at once. |
 
 ---
 
@@ -736,17 +829,19 @@ StickyNotification.startService({
 | **Background** (process alive) | Same path; event is queued until JS layer resumes |
 | **Killed / cold start** | Receiver writes action event to `SharedPreferences`; app is launched; module reads and emits in `onHostResume()` |
 
-**Retry logic** — on New Architecture, `onHostResume` fires before the JS bundle finishes loading. The module defers the first emit by 150 ms and retries up to 8 times with a 250 ms back-off until the bridge accepts the call. Both action-press and service-stop events share this retry queue.
+**Retry logic** — on New Architecture, `onHostResume` fires before the JS bundle finishes loading. The module defers the first emit by 150 ms and retries up to 8 times with a 250 ms back-off until the bridge accepts the call. Action-press and service-stop events share this retry queue.
 
 **Force-stop** — when the user force-stops the app from Android Settings, both the service and the notification are removed immediately. No delivery is expected after a force-stop.
 
-### Service stop event reliability
+### Event reliability at a glance
 
-| Stop reason | Reliability |
-|---|---|
-| `MANUAL_STOP` | **Guaranteed** — emitted synchronously before the service tears down, while the bridge is always ready. |
-| `SWIPE_DISMISS` | **Reliable** — emitted as soon as the `deleteIntent` fires. Queued and retried if the bridge is not yet ready. |
-| `SYSTEM_KILLED` | **Best-effort** — emitted inside `onDestroy`. Delivered when the module instance is still alive; may not reach JS in the same process run if the entire process is being killed simultaneously. |
+| Event | When it fires | Reliability |
+|---|---|---|
+| **Service start** (`addServiceStartListener`) | Right after `startForeground()` completes — notification is visible | **Guaranteed** — bridge is always ready because the user just called `startService()` from JS. Falls back to a 150 ms retry if the bridge is somehow not ready yet. |
+| **Action press** (`addActionListener`) | User taps an action button | **Guaranteed** — persisted to `SharedPreferences` when the process is killed; replayed on next resume. |
+| **`MANUAL_STOP`** (`addServiceStopListener`) | `stopService()` called from JS | **Guaranteed** — emitted before the service tears down while the bridge is always live. |
+| **`SWIPE_DISMISS`** (`addServiceStopListener`) | User swipes notification (Android 14+) | **Reliable** — emitted when `deleteIntent` fires; queued and retried if the bridge is not yet ready. |
+| **`SYSTEM_KILLED`** (`addServiceStopListener`) | Android terminates the service unexpectedly | **Best-effort** — emitted inside `onDestroy`; may not reach JS if the whole process is being killed simultaneously. |
 
 ---
 

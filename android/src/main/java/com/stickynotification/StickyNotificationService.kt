@@ -47,6 +47,8 @@ class StickyNotificationService : Service() {
         stopEventEmitted = false   // fresh session — clear the guard
         startForegroundWithNotification(config)
         isRunning = true
+        // Notify JS that the notification is now visible.
+        StickyNotificationModule.notifyServiceStarted()
       }
 
       ACTION_UPDATE -> {
