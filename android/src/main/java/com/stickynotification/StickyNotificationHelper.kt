@@ -83,7 +83,10 @@ object StickyNotificationHelper {
     val actionLabelColor: Int?,
     val actionIconTint: Int?,
     val actionBackground: Int?,
-    val actionBorderRadius: Float,        // dp — applied to all buttons
+    val actionBorderRadius: Float,        // dp
+    val actionSpacing: Float,             // dp — horizontal padding on each button
+    val rowSpacing: Float,               // dp — vertical padding on each row
+    val actionIconSpacing: Float,         // dp — gap between icon and label
     val actionsContainerBackground: Int?,
   )
 
@@ -120,6 +123,9 @@ object StickyNotificationHelper {
       actionIconTint = parseColor(config.getString("actionIconTint")),
       actionBackground = parseColor(config.getString("actionBackground")),
       actionBorderRadius = (config.get("actionBorderRadius") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
+      actionSpacing = (config.get("actionSpacing") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
+      rowSpacing = (config.get("rowSpacing") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
+      actionIconSpacing = (config.get("actionIconSpacing") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 2f,
       actionsContainerBackground = parseColor(config.getString("actionsContainerBackground")),
     )
 
@@ -219,8 +225,16 @@ object StickyNotificationHelper {
 
     val visibleActions = if (maxButtons > 0) actions.take(maxButtons) else actions
 
+    val density = context.resources.displayMetrics.density
+
     visibleActions.chunked(buttonsPerRow).forEach { rowActions ->
       val rowView = RemoteViews(pkg, R.layout.notification_action_row)
+
+      // Vertical gap between rows — applied as top+bottom padding on the row.
+      if (style.rowSpacing > 0f) {
+        val rowPx = (style.rowSpacing * density).toInt()
+        rowView.setViewPadding(R.id.action_row, 0, rowPx, 0, rowPx)
+      }
 
       rowActions.forEach rowLoop@{ actionBundle ->
         val actionId = actionBundle.getString("id") ?: return@rowLoop
@@ -238,13 +252,14 @@ object StickyNotificationHelper {
 
         val buttonView = RemoteViews(pkg, R.layout.notification_action_button)
 
+        // ── Horizontal spacing (gap between buttons) ──────────────────────
+        if (style.actionSpacing > 0f) {
+          val spacePx = (style.actionSpacing * density).toInt()
+          buttonView.setViewPadding(R.id.action_button, spacePx, 0, spacePx, 0)
+        }
+
         // ── Background (flat colour or rounded-rect bitmap) ───────────────
         if (btnBackground != null || btnRadius > 0f) {
-          val density = context.resources.displayMetrics.density
-          // Use the fixed row height (52dp) for the bitmap height; use a wide
-          // fixed width (200dp) that fitXY will stretch to the real button size.
-          // Corner accuracy is best when the bitmap aspect ratio is close to the
-          // rendered button's, which holds for typical buttonsPerRow values.
           val bitmapH = (52 * density).toInt().coerceAtLeast(1)
           val bitmapW = (200 * density).toInt().coerceAtLeast(1)
           val radiusPx = btnRadius * density
@@ -270,6 +285,9 @@ object StickyNotificationHelper {
           buttonView.setViewVisibility(R.id.action_icon, View.VISIBLE)
           buttonView.setImageViewResource(R.id.action_icon, iconRes)
           btnIconTint?.let { buttonView.setInt(R.id.action_icon, "setColorFilter", it) }
+          // Gap between icon and label — only meaningful when an icon is shown.
+          val iconSpacePx = (style.actionIconSpacing * density).toInt()
+          buttonView.setViewPadding(R.id.action_text, 0, iconSpacePx, 0, 0)
         } else {
           buttonView.setViewVisibility(R.id.action_icon, View.GONE)
         }

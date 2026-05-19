@@ -160,6 +160,8 @@ StickyNotification.startService({
   actionBackground: '#2A2A2A',
   actionLabelColor: '#FFFFFF',
   actionIconTint: '#AAAAAA',
+  actionSpacing: 6,                // 6 dp on each side → 12 dp gap between buttons
+  rowSpacing: 4,                   // 4 dp above/below each row → 8 dp between rows
 
   actions: [
     { id: 'prev',  title: 'Prev',  icon: 'ic_skip_previous' },
@@ -364,7 +366,7 @@ StickyNotification.addActionListener(({ actionId }) => {
 
 ### 🎭 Action Button Styling (Global)
 
-These apply to **all** action buttons. Individual buttons can override them — see [Per-Button Styling](#per-button-styling) below.
+These apply to **all** action buttons. Individual buttons can override colours and border radius — see [Per-Button Styling](#per-button-styling) below.
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
@@ -372,6 +374,9 @@ These apply to **all** action buttons. Individual buttons can override them — 
 | `actionIconTint` | `string` | None | Hex tint applied to every button's icon via a `SRC_ATOP` colour filter. No effect on icon-less buttons. |
 | `actionBackground` | `string` | None | Hex background colour for each individual button. |
 | `actionBorderRadius` | `number` | `0` | Corner radius in dp for button backgrounds. Set to a large value (e.g. `100`) for a pill/capsule shape. Requires `actionBackground` to be visible. |
+| `actionSpacing` | `number` | `0` | Horizontal padding added to the **left and right** of every button, in dp. Creates a visible gap between adjacent buttons. The background (including border radius) is drawn inside the padded area, so pill/rounded buttons appear as separate chips. Example: `actionSpacing: 6` → 6 dp on each side → 12 dp gap between two adjacent buttons. |
+| `rowSpacing` | `number` | `0` | Vertical padding added **above and below** each row of buttons, in dp. Creates a visible gap between rows when there are multiple rows. Example: `rowSpacing: 4` → 4 dp above and below each row → 8 dp gap between rows. |
+| `actionIconSpacing` | `number` | `2` | Vertical gap in dp between the icon and the label text inside each button. Only applies to buttons that have an icon; buttons without an icon are unaffected. |
 | `actionsContainerBackground` | `string` | None | Hex background colour for the entire button strip container. |
 
 ---
@@ -452,6 +457,9 @@ interface StickyNotificationOptions {
   actionIconTint?: string;
   actionBackground?: string;
   actionBorderRadius?: number;
+  actionSpacing?: number;
+  rowSpacing?: number;
+  actionIconSpacing?: number;
   actionsContainerBackground?: string;
 }
 ```
@@ -530,9 +538,30 @@ buttonsPerRow: 5, 7 actions → 2 rows
 │ Title                                   │
 │ Body text                               │
 ├ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤  ← showDivider
-│ [Btn1] [Btn2] [Btn3] [Btn4] [Btn5]     │  ← row 1
+│ [Btn1] [Btn2] [Btn3] [Btn4] [Btn5]     │  ← row 1   ↕ rowSpacing
 │       [Btn6] [Btn7]                     │  ← row 2
 └─────────────────────────────────────────┘
+       ↑←actionSpacing→↑
+         gap between buttons
+```
+
+### Spacing props at a glance
+
+| Prop | Controls | Visual effect |
+|---|---|---|
+| `actionSpacing` | Left + right padding on each button | Gap between adjacent buttons in the same row |
+| `rowSpacing` | Top + bottom padding on each row | Gap between rows |
+| `actionIconSpacing` | Top padding on the label inside each button | Gap between icon and label text (icon-bearing buttons only) |
+
+```ts
+// Pill buttons with gaps — chip-style layout
+StickyNotification.startService({
+  actionBorderRadius: 100,
+  actionBackground: '#2A2A2A',
+  actionSpacing: 6,    // 12 dp gap between adjacent buttons
+  rowSpacing: 4,       // 8 dp gap between rows
+  actions: [...],
+});
 ```
 
 ### Choosing `buttonsPerRow`

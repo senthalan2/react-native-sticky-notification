@@ -206,6 +206,39 @@ export interface StickyNotificationOptions {
    */
   actionBorderRadius?: number;
   /**
+   * Horizontal padding applied to each action button, in dp.
+   *
+   * This padding is added on the left and right of every button's root
+   * container, which creates a visible gap between adjacent buttons.
+   * The background (including border radius) is drawn inside the padded
+   * area, so rounded buttons will appear as separate chips with space
+   * between them.
+   *
+   * Example: `actionSpacing: 4` → 4 dp gap on each side of every button
+   * → 8 dp visible gap between two adjacent buttons.
+   *
+   * Default: 0.
+   */
+  actionSpacing?: number;
+  /**
+   * Vertical padding applied to each button row container, in dp.
+   *
+   * Adds space above and below every row of action buttons, creating a
+   * visible gap between rows when `buttonsPerRow` is less than the total
+   * number of actions.
+   *
+   * Default: 0.
+   */
+  rowSpacing?: number;
+  /**
+   * Vertical gap between the icon and the label text inside each action button, in dp.
+   *
+   * Only applies to buttons that have an icon; buttons with no icon are unaffected.
+   *
+   * Default: 2.
+   */
+  actionIconSpacing?: number;
+  /**
    * Hex background colour for the entire row-container that holds all the
    * action buttons.  Use this to colour the strip as a whole while keeping
    * individual buttons transparent.
