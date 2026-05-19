@@ -580,6 +580,145 @@ const running = await StickyNotification.isServiceRunning();     // always false
 
 ---
 
+## 🏪 Google Play Compliance
+
+This section covers every aspect of the library that intersects with Google Play policies, Android's foreground-service rules, and notification-abuse guidelines. Read it before submitting your app.
+
+---
+
+### ✅ What is fully compliant
+
+| Feature | Status | Reason |
+|---|---|---|
+| Foreground service with visible notification | ✅ Allowed | Tied to an active, user-started operation |
+| Unlimited action buttons via `RemoteViews` | ✅ Allowed | Standard Android API, no policy restrictions |
+| `POST_NOTIFICATIONS` runtime permission | ✅ Allowed | Declared correctly; must be requested with rationale |
+| `closeOnAction` trampoline activity | ✅ Allowed | Launching an Activity from a notification is the recommended pattern |
+| `openAppOnAction` | ✅ Allowed | Bringing an app to foreground from a notification the user tapped is explicitly permitted |
+| Killed-state event delivery via `SharedPreferences` | ✅ Allowed | Standard pattern used by all major notification libraries |
+| `START_STICKY` service restart | ✅ Allowed | Standard Android foreground service contract |
+
+---
+
+### ⚠️ Areas that need your attention
+
+#### 1. Foreground Service Type — `dataSync` vs your actual use case
+
+The library declares `foregroundServiceType="dataSync"` in its manifest. **Google Play requires the declared service type to accurately describe what your service actually does.** Using the wrong type can result in your app being rejected or removed.
+
+| Your use case | Correct `foregroundServiceType` |
+|---|---|
+| Music / audio / video playback | `mediaPlayback` |
+| Turn-by-turn navigation, live location | `location` |
+| Active phone / video call | `phoneCall` |
+| File upload / download, data sync | `dataSync` ✅ (library default) |
+| Camera or microphone recording | `camera` / `microphone` |
+| Connected device (Bluetooth, USB) | `connectedDevice` |
+| Health / fitness tracking | `health` |
+
+**Override the service type** in your app's `AndroidManifest.xml` using manifest merger `tools:replace`:
+
+```xml
+<!-- Add xmlns:tools to your manifest root if not already present -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+  <!-- Override the service type declared by the library -->
+  <application>
+    <service
+      android:name="com.stickynotification.StickyNotificationService"
+      android:foregroundServiceType="mediaPlayback"
+      tools:replace="android:foregroundServiceType" />
+  </application>
+
+</manifest>
+```
+
+Also declare the matching permission in your app manifest:
+
+```xml
+<!-- mediaPlayback example -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+<!-- location example -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+```
+
+> **Note:** `FOREGROUND_SERVICE_DATA_SYNC` is already declared by the library. If you switch to a different service type, remove the `dataSync` permission from your app or add a `tools:remove` override to avoid an unnecessary permission declaration.
+
+---
+
+#### 2. `repostOnDismiss` — use responsibly
+
+Android 14 deliberately gave users the ability to swipe away foreground service notifications. Setting `repostOnDismiss: true` (the library default) immediately re-posts the notification after the user swipes it, effectively overriding that user control.
+
+Google Play's **Device and Network Abuse policy** prohibits apps from "circumventing system processes or controls." Re-posting is generally acceptable for services where the notification is functionally necessary (media player transport controls, live navigation), but it may be flagged for apps where the notification is primarily informational or promotional.
+
+**Guideline:**
+
+| Scenario | Recommendation |
+|---|---|
+| Music player — user needs notification to pause/skip | `repostOnDismiss: true` ✅ |
+| Navigation — user needs turn-by-turn visible | `repostOnDismiss: true` ✅ |
+| Download progress — informational only | `repostOnDismiss: false` ✅ |
+| Fitness tracker step count — informational | `repostOnDismiss: false` ✅ |
+| Any advertising or promotional content | `repostOnDismiss: false` — required |
+
+---
+
+#### 3. `POST_NOTIFICATIONS` permission rationale
+
+Google Play requires that runtime permission requests are preceded by an explanation of why the permission is needed. Show a rationale dialog **before** calling `PermissionsAndroid.request` if the user has previously denied the permission:
+
+```tsx
+const granted = await PermissionsAndroid.check(
+  PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+);
+if (!granted) {
+  const shouldShowRationale = await PermissionsAndroid.shouldShowRequestPermissionRationale(
+    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+  );
+  if (shouldShowRationale) {
+    // Show your own UI explaining why notifications are needed
+    await showNotificationRationaleDialog();
+  }
+  await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+  );
+}
+```
+
+---
+
+#### 4. Acceptable vs unacceptable use cases
+
+Google Play's foreground service policy states that foreground services must "perform tasks that are noticeable to users" and must be "initiated by the user." The library is a tool — compliance depends entirely on how you use it.
+
+| ✅ Acceptable | ❌ Not acceptable |
+|---|---|
+| Media player with transport controls | Advertising or promotional banners |
+| Active navigation / live location sharing | Spam notifications or re-engagement outside user intent |
+| Ongoing fitness / workout tracking | Keeping the app alive purely to collect analytics |
+| File download / upload with progress | Circumventing battery optimization without user consent |
+| VoIP call in progress | Any content that misleads or deceives the user |
+| Real-time data sync the user initiated | Background activity the user did not start |
+
+---
+
+### 📋 Pre-submission checklist
+
+Before submitting to Google Play, verify:
+
+- [ ] `foregroundServiceType` in your manifest matches your actual use case
+- [ ] The matching `FOREGROUND_SERVICE_*` permission is declared
+- [ ] `POST_NOTIFICATIONS` is requested at runtime with a clear rationale
+- [ ] The foreground service is only started in response to a direct user action
+- [ ] `repostOnDismiss` is `false` (or justified) for informational-only notifications
+- [ ] Your Play Store listing description accurately describes the notification feature
+- [ ] If Google Play requires a video during review, record the notification appearing and action buttons working as part of a real user flow
+
+---
+
 ## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and pull-request guidelines.
