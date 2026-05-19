@@ -78,4 +78,18 @@
         android:layout_height="wrap_content"
         android:orientation="vertical" />
 
+    <!-- ── Footer text (optional, centered, rendered below action buttons) ─ -->
+    <TextView
+        android:id="@+id/notification_footer_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:textSize="12sp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone"
+        android:text="" />
+
 </LinearLayout>

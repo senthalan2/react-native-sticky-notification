@@ -299,6 +299,36 @@ export interface StickyNotificationOptions {
    * Minimum: 1.
    */
   buttonsPerRow?: number;
+
+  // ── Footer text ───────────────────────────────────────────────────────────
+  /**
+   * Optional text displayed below the action buttons, centered horizontally.
+   * Hidden when absent or empty.
+   */
+  footerText?: string;
+  /**
+   * Default (lowest priority) colour for the footer text, e.g. "#888888".
+   * Overridden by `footerWordColors` and `footerLetterColors` where they apply.
+   */
+  footerTextColor?: string;
+  /**
+   * Per-word colour overrides for the footer text.
+   * Every occurrence of `word` in the footer string is coloured with `color`.
+   * Overrides `footerTextColor`; overridden by `footerLetterColors`.
+   *
+   * @example
+   * footerWordColors: [{ word: 'Kansas', color: '#FF5722' }]
+   */
+  footerWordColors?: Array<{ word: string; color: string }>;
+  /**
+   * Per-character colour overrides for the footer text (highest priority).
+   * `index` is the zero-based character position in `footerText`.
+   * Overrides both `footerTextColor` and `footerWordColors`.
+   *
+   * @example
+   * footerLetterColors: [{ index: 0, color: '#FF0000' }, { index: 1, color: '#00FF00' }]
+   */
+  footerLetterColors?: Array<{ index: number; color: string }>;
 }
 
 /**

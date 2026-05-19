@@ -14,6 +14,9 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Build
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -87,10 +90,13 @@ object StickyNotificationHelper {
     val containerBackground: Int?,
     val containerBorderRadius: Float,     // dp — corner radius for the whole panel
     val actionBorderRadius: Float,        // dp
-    val actionSpacing: Float,             // dp — horizontal padding on each button
+    val actionSpacing: Float,             // dp — horizontal gap between buttons (right-side only)
     val rowSpacing: Float,               // dp — vertical padding on each row
     val actionIconSpacing: Float,         // dp — gap between icon and label
     val actionsContainerBackground: Int?,
+    val footerTextColor: Int?,
+    val footerWordColors: ArrayList<Bundle>?,
+    val footerLetterColors: ArrayList<Bundle>?,
   )
 
   // ─── Public API ────────────────────────────────────────────────────────
@@ -116,6 +122,11 @@ object StickyNotificationHelper {
     val buttonsPerRow = config.getInt("buttonsPerRow", DEFAULT_BUTTONS_PER_ROW).coerceAtLeast(1)
     val maxButtons = config.getInt("maxButtons", 0)
 
+    @Suppress("UNCHECKED_CAST")
+    val footerWordColorsRaw: ArrayList<Bundle>? = config.getParcelableArrayList("footerWordColors")
+    @Suppress("UNCHECKED_CAST")
+    val footerLetterColorsRaw: ArrayList<Bundle>? = config.getParcelableArrayList("footerLetterColors")
+
     val style = Style(
       showLabelsInCollapsed = if (config.containsKey("showLabelsInCollapsed")) config.getBoolean("showLabelsInCollapsed") else false,
       showDivider = if (config.containsKey("showDivider")) config.getBoolean("showDivider") else true,
@@ -133,7 +144,12 @@ object StickyNotificationHelper {
       rowSpacing = (config.get("rowSpacing") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f,
       actionIconSpacing = (config.get("actionIconSpacing") as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 2f,
       actionsContainerBackground = parseColor(config.getString("actionsContainerBackground")),
+      footerTextColor = parseColor(config.getString("footerTextColor")),
+      footerWordColors = footerWordColorsRaw,
+      footerLetterColors = footerLetterColorsRaw,
     )
+
+    val footerText = config.getString("footerText")
 
     @Suppress("UNCHECKED_CAST")
     val actionsBundle: ArrayList<Bundle>? = config.getParcelableArrayList("actions")
@@ -145,7 +161,7 @@ object StickyNotificationHelper {
       ?: context.applicationInfo.icon
 
     val bigView = buildBigContentView(
-      context, title, text, subText, actionsBundle,
+      context, title, text, subText, footerText, actionsBundle,
       buttonsPerRow, maxButtons, openAppOnAction, closeOnAction, style
     )
 
@@ -184,6 +200,7 @@ object StickyNotificationHelper {
     title: String?,
     text: String?,
     subText: String?,
+    footerText: String?,
     actions: ArrayList<Bundle>?,
     buttonsPerRow: Int,
     maxButtons: Int,
@@ -250,6 +267,16 @@ object StickyNotificationHelper {
       views.setViewVisibility(R.id.notification_divider, View.GONE)
     }
 
+    // ── Footer text ───────────────────────────────────────────────────────
+    if (!footerText.isNullOrEmpty()) {
+      views.setViewVisibility(R.id.notification_footer_text, View.VISIBLE)
+      val styledText = buildFooterText(footerText, style.footerWordColors, style.footerLetterColors)
+      views.setTextViewText(R.id.notification_footer_text, styledText)
+      style.footerTextColor?.let { views.setTextColor(R.id.notification_footer_text, it) }
+    } else {
+      views.setViewVisibility(R.id.notification_footer_text, View.GONE)
+    }
+
     // ── Action buttons ────────────────────────────────────────────────────
     if (actions.isNullOrEmpty()) return views
 
@@ -270,8 +297,8 @@ object StickyNotificationHelper {
         rowView.setViewPadding(R.id.action_row, 0, rowPx, 0, rowPx)
       }
 
-      rowActions.forEach rowLoop@{ actionBundle ->
-        val actionId = actionBundle.getString("id") ?: return@rowLoop
+      rowActions.forEachIndexed { btnIndex, actionBundle ->
+        val actionId = actionBundle.getString("id") ?: return@forEachIndexed
         val actionTitle = actionBundle.getString("title") ?: actionId
         val iconName = actionBundle.getString("icon")
         val payload = actionBundle.getString("payload")
@@ -287,9 +314,15 @@ object StickyNotificationHelper {
         val buttonView = RemoteViews(pkg, R.layout.notification_action_button)
 
         // ── Horizontal spacing (gap between buttons) ──────────────────────
+        // Left padding is 0 for the first button so it aligns with the
+        // container edge.  Right padding is omitted on the last button to
+        // avoid trailing space.  This gives equal visual gaps between every
+        // pair of adjacent buttons with no extra space at either edge.
         if (style.actionSpacing > 0f) {
           val spacePx = (style.actionSpacing * density).toInt()
-          buttonView.setViewPadding(R.id.action_button, spacePx, 0, spacePx, 0)
+          val leftPad  = if (btnIndex == 0) 0 else spacePx
+          val rightPad = if (btnIndex == rowActions.size - 1) 0 else spacePx
+          buttonView.setViewPadding(R.id.action_button, leftPad, 0, rightPad, 0)
         }
 
         // ── Background (flat colour or rounded-rect bitmap) ───────────────
@@ -366,8 +399,8 @@ object StickyNotificationHelper {
 
     val density = context.resources.displayMetrics.density
 
-    actions.forEach actionLoop@{ actionBundle ->
-      val actionId = actionBundle.getString("id") ?: return@actionLoop
+    actions.forEachIndexed { btnIndex, actionBundle ->
+      val actionId = actionBundle.getString("id") ?: return@forEachIndexed
       val actionTitle = actionBundle.getString("title") ?: actionId
       val iconName = actionBundle.getString("icon")
       val payload = actionBundle.getString("payload")
@@ -383,7 +416,9 @@ object StickyNotificationHelper {
 
       if (style.actionSpacing > 0f) {
         val spacePx = (style.actionSpacing * density).toInt()
-        buttonView.setViewPadding(R.id.action_button, spacePx, 0, spacePx, 0)
+        val leftPad  = if (btnIndex == 0) 0 else spacePx
+        val rightPad = if (btnIndex == actions.size - 1) 0 else spacePx
+        buttonView.setViewPadding(R.id.action_button, leftPad, 0, rightPad, 0)
       }
 
       if (btnBackground != null || btnRadius > 0f) {
@@ -504,6 +539,57 @@ object StickyNotificationHelper {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Builds a CharSequence for the footer text with layered color spans.
+   *
+   * Priority (highest wins):
+   *   1. Letter-level colors  (footerLetterColors — per character index)
+   *   2. Word-level colors    (footerWordColors   — all occurrences of a word)
+   *   3. Full text color      (handled via setTextColor in the caller)
+   *
+   * Returns the plain String when neither word nor letter colors are given
+   * (avoids allocating a SpannableString for the common case).
+   */
+  private fun buildFooterText(
+    text: String,
+    wordColors: ArrayList<Bundle>?,
+    letterColors: ArrayList<Bundle>?,
+  ): CharSequence {
+    if (wordColors.isNullOrEmpty() && letterColors.isNullOrEmpty()) return text
+
+    val spannable = SpannableString(text)
+
+    // Word colors applied first (lower priority — letter spans override later).
+    wordColors?.forEach { bundle ->
+      val word  = bundle.getString("word")  ?: return@forEach
+      val color = parseColor(bundle.getString("color")) ?: return@forEach
+      var start = 0
+      while (true) {
+        val found = text.indexOf(word, start)
+        if (found == -1) break
+        spannable.setSpan(
+          ForegroundColorSpan(color), found, found + word.length,
+          Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        start = found + word.length
+      }
+    }
+
+    // Letter colors applied last (highest priority — overrides word spans).
+    letterColors?.forEach { bundle ->
+      val idx   = bundle.getInt("index", -1)
+      val color = parseColor(bundle.getString("color")) ?: return@forEach
+      if (idx in 0 until text.length) {
+        spannable.setSpan(
+          ForegroundColorSpan(color), idx, idx + 1,
+          Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+      }
+    }
+
+    return spannable
+  }
 
   /**
    * Renders a rounded rectangle into a Bitmap.
