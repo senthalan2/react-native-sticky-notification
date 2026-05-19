@@ -14,13 +14,14 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/action_button"
     android:layout_width="0dp"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
     android:layout_weight="1"
     android:clickable="true"
     android:focusable="true">
 
     <!-- Dynamic rounded-rectangle background rendered as a Bitmap at runtime.
-         scaleType="fitXY" stretches it to fill the full button area. -->
+         scaleType="fitXY" stretches it to fill the full button area.
+         match_parent here fills the FrameLayout's wrap_content height. -->
     <ImageView
         android:id="@+id/action_bg"
         android:layout_width="match_parent"
@@ -31,10 +32,13 @@
     <!-- Icon + label stacked vertically, centred over the background layer. -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:gravity="center"
-        android:padding="8dp">
+        android:gravity="center_horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
 
         <ImageView
             android:id="@+id/action_icon"

@@ -147,7 +147,6 @@ object StickyNotificationHelper {
       .setPriority(parsePriority(priorityStr))
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
       .setCustomBigContentView(bigView)
-      .setStyle(NotificationCompat.DecoratedCustomViewStyle())
       .setContentIntent(buildLaunchPendingIntent(context))
       .apply { if (repostOnDismiss) setDeleteIntent(buildRepostPendingIntent(context)) }
 
@@ -178,6 +177,10 @@ object StickyNotificationHelper {
   ): RemoteViews {
     val pkg = context.packageName
     val views = RemoteViews(pkg, R.layout.notification_panel)
+
+    // ── Header container (hidden entirely when all text fields are empty) ─
+    val hasAnyText = !title.isNullOrEmpty() || !text.isNullOrEmpty() || !subText.isNullOrEmpty()
+    views.setViewVisibility(R.id.notification_header, if (hasAnyText) View.VISIBLE else View.GONE)
 
     // ── Title (hidden when null or empty) ────────────────────────────────
     if (!title.isNullOrEmpty()) {
