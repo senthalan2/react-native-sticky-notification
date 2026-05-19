@@ -88,6 +88,31 @@ export interface StickyNotificationOptions {
    */
   autoCancel?: boolean;
   /**
+   * Open the app when an action button is tapped while the app is in the
+   * foreground or background.
+   *
+   * When the app process is killed, the app is always brought to the
+   * foreground regardless of this prop (the process must start to deliver
+   * the event to JS).
+   *
+   * Default: false.
+   */
+  openAppOnAction?: boolean;
+
+  /**
+   * Collapse the notification panel when an action button is tapped.
+   *
+   * Implemented via a transparent trampoline Activity.  Starting an Activity
+   * from the notification is the only reliable cross-version mechanism to
+   * close the notification drawer; it also bypasses Android 10+ Background
+   * Activity Launch restrictions that can silently block panel closure when
+   * using a BroadcastReceiver.
+   *
+   * Default: false.
+   */
+  closeOnAction?: boolean;
+
+  /**
    * Re-post the notification immediately after the user swipes it away.
    *
    * Android 14+ allows users to dismiss foreground service notifications even

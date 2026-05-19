@@ -20,6 +20,19 @@
       android:enabled="true"
       android:exported="false" />
 
+    <!--
+      Transparent trampoline used for notification action buttons when
+      closeOnAction or openAppOnAction is enabled.  Starting an Activity from
+      the notification PendingIntent collapses the notification panel and
+      bypasses Android 10+ Background Activity Launch restrictions.
+    -->
+    <activity
+      android:name=".StickyNotificationTrampolineActivity"
+      android:exported="false"
+      android:theme="@android:style/Theme.NoDisplay"
+      android:excludeFromRecents="true"
+      android:taskAffinity="" />
+
   </application>
 
 </manifest>

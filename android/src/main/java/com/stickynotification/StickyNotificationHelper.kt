@@ -78,6 +78,8 @@ object StickyNotificationHelper {
     val ongoing = if (config.containsKey("ongoing")) config.getBoolean("ongoing") else true
     val autoCancel = if (config.containsKey("autoCancel")) config.getBoolean("autoCancel") else false
     val repostOnDismiss = if (config.containsKey("repostOnDismiss")) config.getBoolean("repostOnDismiss") else true
+    val openAppOnAction = if (config.containsKey("openAppOnAction")) config.getBoolean("openAppOnAction") else false
+    val closeOnAction = if (config.containsKey("closeOnAction")) config.getBoolean("closeOnAction") else false
 
     // Button layout params
     val buttonsPerRow = config.getInt("buttonsPerRow", DEFAULT_BUTTONS_PER_ROW)
@@ -91,7 +93,8 @@ object StickyNotificationHelper {
       ?: context.applicationInfo.icon
 
     val bigView = buildBigContentView(
-      context, title, text, subText, actionsBundle, buttonsPerRow, maxButtons
+      context, title, text, subText, actionsBundle, buttonsPerRow, maxButtons,
+      openAppOnAction, closeOnAction
     )
 
     val builder = NotificationCompat.Builder(context, channelId)
@@ -132,6 +135,8 @@ object StickyNotificationHelper {
     actions: ArrayList<Bundle>?,
     buttonsPerRow: Int,
     maxButtons: Int,
+    openAppOnAction: Boolean,
+    closeOnAction: Boolean,
   ): RemoteViews {
     val pkg = context.packageName
     val views = RemoteViews(pkg, R.layout.notification_panel)
@@ -173,7 +178,15 @@ object StickyNotificationHelper {
           buttonView.setViewVisibility(R.id.action_icon, View.GONE)
         }
 
-        val pendingIntent = buildActionPendingIntent(context, actionId, payload)
+        // Use a trampoline Activity PendingIntent when either closeOnAction or
+        // openAppOnAction is requested: starting an Activity automatically
+        // collapses the notification panel and bypasses Android 10+ BAL
+        // restrictions that can silently block startActivity() from a receiver.
+        val pendingIntent = if (closeOnAction || openAppOnAction) {
+          buildTrampolinePendingIntent(context, actionId, payload, openAppOnAction)
+        } else {
+          buildActionPendingIntent(context, actionId, payload)
+        }
         buttonView.setOnClickPendingIntent(R.id.action_button, pendingIntent)
 
         // Append this button to the current row
@@ -216,6 +229,31 @@ object StickyNotificationHelper {
       ?.apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP }
       ?: Intent()
     return PendingIntent.getActivity(context, 0, launchIntent, pendingIntentFlags())
+  }
+
+  private fun buildTrampolinePendingIntent(
+    context: Context,
+    actionId: String,
+    payload: String?,
+    openApp: Boolean,
+  ): PendingIntent {
+    val intent = Intent(context, StickyNotificationTrampolineActivity::class.java).apply {
+      // Each action needs a unique Intent so Android doesn't reuse the same
+      // PendingIntent for every button.  Using actionId.hashCode() as the
+      // requestCode achieves this without adding flags that bypass caching.
+      putExtra(StickyNotificationTrampolineActivity.EXTRA_ACTION_ID, actionId)
+      payload?.let { putExtra(StickyNotificationTrampolineActivity.EXTRA_PAYLOAD, it) }
+      putExtra(StickyNotificationTrampolineActivity.EXTRA_OPEN_APP, openApp)
+      // FLAG_ACTIVITY_SINGLE_TOP keeps the trampoline from stacking multiple
+      // instances if the user taps rapidly.
+      addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+    return PendingIntent.getActivity(
+      context,
+      actionId.hashCode(),
+      intent,
+      pendingIntentFlags()
+    )
   }
 
   private fun buildRepostPendingIntent(context: Context): PendingIntent {
