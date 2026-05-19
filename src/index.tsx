@@ -87,6 +87,20 @@ export interface StickyNotificationOptions {
    * Default: false.
    */
   autoCancel?: boolean;
+  /**
+   * Re-post the notification immediately after the user swipes it away.
+   *
+   * Android 14+ allows users to dismiss foreground service notifications even
+   * when `ongoing` is true.  Setting this to `true` attaches a `deleteIntent`
+   * that calls back into the running service to re-show the notification,
+   * making it effectively non-dismissible on all Android versions.
+   *
+   * Set to `false` if you want Android 14+ users to be able to hide the
+   * notification temporarily without stopping the service.
+   *
+   * Default: true.
+   */
+  repostOnDismiss?: boolean;
 
   // ── Actions ───────────────────────────────────────────────────────────────
   /**

@@ -24,11 +24,20 @@ class StickyNotificationService : Service() {
   /** Notification ID used for the current foreground session. */
   private var notificationId = DEFAULT_NOTIFICATION_ID
 
+  /**
+   * Last config bundle used to build the notification.
+   * Retained so ACTION_REPOST can rebuild it without a full restart.
+   * On Android 14+ the system allows users to swipe away foreground service
+   * notifications; the deleteIntent sends ACTION_REPOST to re-show it.
+   */
+  private var lastConfig: Bundle? = null
+
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
       ACTION_START -> {
         val config = intent.getBundleExtra(EXTRA_CONFIG) ?: Bundle()
         notificationId = config.getInt("notificationId", DEFAULT_NOTIFICATION_ID)
+        lastConfig = config
         startForegroundWithNotification(config)
         isRunning = true
       }
@@ -36,14 +45,25 @@ class StickyNotificationService : Service() {
       ACTION_UPDATE -> {
         if (isRunning) {
           val config = intent.getBundleExtra(EXTRA_CONFIG) ?: Bundle()
-          // Use the notificationId from the update payload if provided
           val updateId = config.getInt("notificationId", notificationId)
+          lastConfig = config
           val notification = StickyNotificationHelper.buildNotification(this, config)
           StickyNotificationHelper.getNotificationManager(this).notify(updateId, notification)
         }
       }
 
+      ACTION_REPOST -> {
+        // Fired by the notification's deleteIntent when the user swipes it away
+        // on Android 14+ (where foreground service notifications are dismissible).
+        // Re-calling startForeground() re-attaches the notification to the service.
+        if (isRunning) {
+          val config = lastConfig ?: Bundle()
+          startForegroundWithNotification(config)
+        }
+      }
+
       ACTION_STOP -> {
+        lastConfig = null
         isRunning = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
           stopForeground(STOP_FOREGROUND_REMOVE)
@@ -82,6 +102,7 @@ class StickyNotificationService : Service() {
     const val ACTION_START = "com.stickynotification.START"
     const val ACTION_UPDATE = "com.stickynotification.UPDATE"
     const val ACTION_STOP = "com.stickynotification.STOP"
+    const val ACTION_REPOST = "com.stickynotification.REPOST"
 
     const val EXTRA_CONFIG = "config"
     const val DEFAULT_NOTIFICATION_ID = 1337

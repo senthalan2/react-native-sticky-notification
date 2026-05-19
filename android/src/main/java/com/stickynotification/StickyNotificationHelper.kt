@@ -77,6 +77,7 @@ object StickyNotificationHelper {
     val priorityStr = config.getString("priority")
     val ongoing = if (config.containsKey("ongoing")) config.getBoolean("ongoing") else true
     val autoCancel = if (config.containsKey("autoCancel")) config.getBoolean("autoCancel") else false
+    val repostOnDismiss = if (config.containsKey("repostOnDismiss")) config.getBoolean("repostOnDismiss") else true
 
     // Button layout params
     val buttonsPerRow = config.getInt("buttonsPerRow", DEFAULT_BUTTONS_PER_ROW)
@@ -107,6 +108,10 @@ object StickyNotificationHelper {
       .setCustomBigContentView(bigView)
       .setStyle(NotificationCompat.DecoratedCustomViewStyle())
       .setContentIntent(buildLaunchPendingIntent(context))
+      // Android 14+ allows users to swipe away foreground service notifications
+      // even when ongoing=true.  When repostOnDismiss is enabled the deleteIntent
+      // immediately re-posts the notification by sending ACTION_REPOST to the service.
+      .apply { if (repostOnDismiss) setDeleteIntent(buildRepostPendingIntent(context)) }
 
     subText?.let { builder.setSubText(it) }
     colorHex?.let { hex -> runCatching { builder.setColor(Color.parseColor(hex)) } }
@@ -208,9 +213,16 @@ object StickyNotificationHelper {
   private fun buildLaunchPendingIntent(context: Context): PendingIntent {
     val launchIntent = context.packageManager
       .getLaunchIntentForPackage(context.packageName)
-      ?.apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+      ?.apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP }
       ?: Intent()
     return PendingIntent.getActivity(context, 0, launchIntent, pendingIntentFlags())
+  }
+
+  private fun buildRepostPendingIntent(context: Context): PendingIntent {
+    val intent = Intent(context, StickyNotificationService::class.java).apply {
+      action = StickyNotificationService.ACTION_REPOST
+    }
+    return PendingIntent.getService(context, 0, intent, pendingIntentFlags())
   }
 
   private fun buildActionPendingIntent(
