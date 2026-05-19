@@ -26,11 +26,17 @@ class StickyNotificationService : Service() {
 
   /**
    * Last config bundle used to build the notification.
-   * Retained so ACTION_REPOST can rebuild it without a full restart.
-   * On Android 14+ the system allows users to swipe away foreground service
-   * notifications; the deleteIntent sends ACTION_REPOST to re-show it.
+   * Retained so ACTION_SWIPE_DISMISS can decide whether to re-show it and
+   * can read the `repostOnDismiss` flag without a full restart.
    */
   private var lastConfig: Bundle? = null
+
+  /**
+   * Guards against double-emitting the service-stop event.
+   * Set to true once a stop reason has been forwarded to the module; reset
+   * to false when a new session starts via ACTION_START.
+   */
+  private var stopEventEmitted = false
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
@@ -38,6 +44,7 @@ class StickyNotificationService : Service() {
         val config = intent.getBundleExtra(EXTRA_CONFIG) ?: Bundle()
         notificationId = config.getInt("notificationId", DEFAULT_NOTIFICATION_ID)
         lastConfig = config
+        stopEventEmitted = false   // fresh session — clear the guard
         startForegroundWithNotification(config)
         isRunning = true
       }
@@ -52,17 +59,26 @@ class StickyNotificationService : Service() {
         }
       }
 
-      ACTION_REPOST -> {
-        // Fired by the notification's deleteIntent when the user swipes it away
-        // on Android 14+ (where foreground service notifications are dismissible).
-        // Re-calling startForeground() re-attaches the notification to the service.
-        if (isRunning) {
-          val config = lastConfig ?: Bundle()
-          startForegroundWithNotification(config)
+      ACTION_SWIPE_DISMISS -> {
+        // Fired by the notification's deleteIntent whenever the user swipes it away.
+        // This replaces the old ACTION_REPOST path and is always attached as the
+        // deleteIntent so swipe events are captured on all Android versions.
+        StickyNotificationModule.notifyServiceStopped("SWIPE_DISMISS")
+
+        val cfg = lastConfig ?: Bundle()
+        val repost = if (cfg.containsKey("repostOnDismiss")) cfg.getBoolean("repostOnDismiss") else true
+        if (repost && isRunning) {
+          // Re-attach the notification to the service so it reappears.
+          startForegroundWithNotification(cfg)
+        } else {
+          // No repost — mark event emitted so onDestroy doesn't double-fire.
+          stopEventEmitted = true
         }
       }
 
       ACTION_STOP -> {
+        StickyNotificationModule.notifyServiceStopped("MANUAL_STOP")
+        stopEventEmitted = true
         lastConfig = null
         isRunning = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -94,15 +110,22 @@ class StickyNotificationService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onDestroy() {
+    // Emit SYSTEM_KILLED only when no explicit stop reason was already reported.
+    // This covers unexpected termination by the Android system (OOM killer, etc.)
+    // as well as cases where the process is killed without going through ACTION_STOP.
+    if (!stopEventEmitted) {
+      StickyNotificationModule.notifyServiceStopped("SYSTEM_KILLED")
+    }
+    stopEventEmitted = false
     isRunning = false
     super.onDestroy()
   }
 
   companion object {
-    const val ACTION_START = "com.stickynotification.START"
-    const val ACTION_UPDATE = "com.stickynotification.UPDATE"
-    const val ACTION_STOP = "com.stickynotification.STOP"
-    const val ACTION_REPOST = "com.stickynotification.REPOST"
+    const val ACTION_START         = "com.stickynotification.START"
+    const val ACTION_UPDATE        = "com.stickynotification.UPDATE"
+    const val ACTION_STOP          = "com.stickynotification.STOP"
+    const val ACTION_SWIPE_DISMISS = "com.stickynotification.SWIPE_DISMISS"
 
     const val EXTRA_CONFIG = "config"
     const val DEFAULT_NOTIFICATION_ID = 1337

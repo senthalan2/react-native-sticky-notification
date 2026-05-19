@@ -115,7 +115,6 @@ object StickyNotificationHelper {
     val priorityStr = config.getString("priority")
     val ongoing = if (config.containsKey("ongoing")) config.getBoolean("ongoing") else true
     val autoCancel = if (config.containsKey("autoCancel")) config.getBoolean("autoCancel") else false
-    val repostOnDismiss = if (config.containsKey("repostOnDismiss")) config.getBoolean("repostOnDismiss") else true
     val openAppOnAction = if (config.containsKey("openAppOnAction")) config.getBoolean("openAppOnAction") else false
     val closeOnAction = if (config.containsKey("closeOnAction")) config.getBoolean("closeOnAction") else false
 
@@ -173,7 +172,7 @@ object StickyNotificationHelper {
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
       .setCustomBigContentView(bigView)
       .setContentIntent(buildLaunchPendingIntent(context))
-      .apply { if (repostOnDismiss) setDeleteIntent(buildRepostPendingIntent(context)) }
+      .setDeleteIntent(buildSwipeDismissPendingIntent(context))
 
     if (!collapsedActionsBundle.isNullOrEmpty()) {
       val collapsedView = buildCollapsedView(
@@ -518,11 +517,12 @@ object StickyNotificationHelper {
     return PendingIntent.getActivity(context, actionId.hashCode(), intent, pendingIntentFlags())
   }
 
-  private fun buildRepostPendingIntent(context: Context): PendingIntent {
+  private fun buildSwipeDismissPendingIntent(context: Context): PendingIntent {
     val intent = Intent(context, StickyNotificationService::class.java).apply {
-      action = StickyNotificationService.ACTION_REPOST
+      action = StickyNotificationService.ACTION_SWIPE_DISMISS
     }
-    return PendingIntent.getService(context, 0, intent, pendingIntentFlags())
+    // Use request code 1 to avoid colliding with the launch PendingIntent (code 0).
+    return PendingIntent.getService(context, 1, intent, pendingIntentFlags())
   }
 
   private fun buildActionPendingIntent(
@@ -577,6 +577,7 @@ object StickyNotificationHelper {
     }
 
     // Letter colors applied last (highest priority — overrides word spans).
+    // Targets the exact character position given by `index`.
     letterColors?.forEach { bundle ->
       val idx   = bundle.getInt("index", -1)
       val color = parseColor(bundle.getString("color")) ?: return@forEach

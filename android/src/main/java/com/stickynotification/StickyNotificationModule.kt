@@ -35,8 +35,10 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 class StickyNotificationModule(reactContext: ReactApplicationContext) :
   NativeStickyNotificationSpec(reactContext), LifecycleEventListener {
 
-  // In-memory queue for events that arrived before JS was ready
+  // In-memory queue for action-press events that arrived before JS was ready
   private val pendingQueue = mutableListOf<Pair<String, String?>>()
+  // In-memory queue for service-stop events
+  private val pendingStopReasons = mutableListOf<String>()
   private var isResumed = false
   private var drainRetryCount = 0
 
@@ -108,6 +110,24 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
   // ─── Inbound event routing (called from BroadcastReceiver) ───────────────
 
   /**
+   * Entry point called by StickyNotificationService when the service stops.
+   * Reason values: "MANUAL_STOP" | "SWIPE_DISMISS" | "SYSTEM_KILLED".
+   */
+  private fun handleServiceStopped(reason: String) {
+    mainHandler.post {
+      if (isResumed) {
+        val delivered = tryEmitServiceStop(reason)
+        if (!delivered) {
+          synchronized(pendingStopReasons) { pendingStopReasons.add(reason) }
+          scheduleRetry()
+        }
+      } else {
+        synchronized(pendingStopReasons) { pendingStopReasons.add(reason) }
+      }
+    }
+  }
+
+  /**
    * Entry point called by StickyNotificationReceiver on the main thread.
    * If the JS layer is already live we attempt immediate delivery; otherwise
    * the event is queued and will be flushed in the next drainEvents pass.
@@ -147,6 +167,16 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
     false
   }
 
+  private fun tryEmitServiceStop(reason: String): Boolean = try {
+    val params = Arguments.createMap().apply { putString("reason", reason) }
+    reactApplicationContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      .emit(EVENT_SERVICE_STOP, params)
+    true
+  } catch (_: Exception) {
+    false
+  }
+
   // ─── Pending-event drain with retry ──────────────────────────────────────
 
   /**
@@ -162,17 +192,33 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
     // Merge the SharedPreferences entry (written by Receiver when process was dead)
     loadPersistedEvent()
 
-    val snapshot: List<Pair<String, String?>>
+    var anyFailed = false
+
+    // ── Action-press events ───────────────────────────────────────────────
+    val actionSnapshot: List<Pair<String, String?>>
     synchronized(pendingQueue) {
-      snapshot = pendingQueue.toList()
+      actionSnapshot = pendingQueue.toList()
       pendingQueue.clear()
     }
+    val failedActions = actionSnapshot.filterNot { (id, pl) -> tryEmit(id, pl) }
+    if (failedActions.isNotEmpty()) {
+      synchronized(pendingQueue) { pendingQueue.addAll(0, failedActions) }
+      anyFailed = true
+    }
 
-    val failed = snapshot.filterNot { (id, pl) -> tryEmit(id, pl) }
+    // ── Service-stop events ───────────────────────────────────────────────
+    val stopSnapshot: List<String>
+    synchronized(pendingStopReasons) {
+      stopSnapshot = pendingStopReasons.toList()
+      pendingStopReasons.clear()
+    }
+    val failedStop = stopSnapshot.filterNot { tryEmitServiceStop(it) }
+    if (failedStop.isNotEmpty()) {
+      synchronized(pendingStopReasons) { pendingStopReasons.addAll(0, failedStop) }
+      anyFailed = true
+    }
 
-    if (failed.isNotEmpty()) {
-      // Preserve order: put failures back at the front
-      synchronized(pendingQueue) { pendingQueue.addAll(0, failed) }
+    if (anyFailed) {
       scheduleRetry()
     } else {
       drainRetryCount = 0
@@ -235,6 +281,7 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
   companion object {
     const val NAME = "StickyNotification"
     const val EVENT_ACTION_PRESS = "StickyNotification_onActionPress"
+    const val EVENT_SERVICE_STOP  = "StickyNotification_onServiceStop"
 
     /**
      * Delay before first drain on resume.  Gives the New Architecture JS
@@ -266,6 +313,18 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
     fun notifyActionPressed(actionId: String, payload: String?): Boolean {
       val instance = currentInstance ?: return false
       instance.handleActionPressed(actionId, payload)
+      return true
+    }
+
+    /**
+     * Called from StickyNotificationService when the service stops for any reason.
+     * Reason values: "MANUAL_STOP" | "SWIPE_DISMISS" | "SYSTEM_KILLED".
+     *
+     * @return true when the module instance was available to accept the event.
+     */
+    fun notifyServiceStopped(reason: String): Boolean {
+      val instance = currentInstance ?: return false
+      instance.handleServiceStopped(reason)
       return true
     }
   }

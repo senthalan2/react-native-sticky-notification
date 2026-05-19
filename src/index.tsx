@@ -322,11 +322,11 @@ export interface StickyNotificationOptions {
   footerWordColors?: Array<{ word: string; color: string }>;
   /**
    * Per-character colour overrides for the footer text (highest priority).
-   * `index` is the zero-based character position in `footerText`.
-   * Overrides both `footerTextColor` and `footerWordColors`.
+   * `index` is the zero-based position of the character in `footerText`.
+   * Overrides both `footerTextColor` and `footerWordColors` at that position.
    *
    * @example
-   * footerLetterColors: [{ index: 0, color: '#FF0000' }, { index: 1, color: '#00FF00' }]
+   * footerLetterColors: [{ index: 0, color: '#FF0000' }, { index: 3, color: '#00FF00' }]
    */
   footerLetterColors?: Array<{ index: number; color: string }>;
 }
@@ -341,9 +341,29 @@ export interface ActionPressEvent {
   payload?: string;
 }
 
+/**
+ * Event payload delivered whenever the foreground service stops, regardless
+ * of how it was terminated.
+ */
+export interface ServiceStopEvent {
+  /**
+   * Why the service stopped:
+   * - `"MANUAL_STOP"`  — `stopService()` was called explicitly from JS.
+   * - `"SWIPE_DISMISS"` — the user swiped the notification away (Android 14+
+   *   allows dismissing foreground-service notifications).  The service may
+   *   still be running if `repostOnDismiss` is true — in that case the
+   *   notification will reappear automatically and this event signals the
+   *   transient dismissal.
+   * - `"SYSTEM_KILLED"` — Android terminated the service (OOM killer, user
+   *   force-stopped the app, etc.) without an explicit JS stop call.
+   */
+  reason: 'MANUAL_STOP' | 'SWIPE_DISMISS' | 'SYSTEM_KILLED';
+}
+
 // ─── Internal event plumbing ───────────────────────────────────────────────
 
-const ACTION_PRESS_EVENT = 'StickyNotification_onActionPress';
+const ACTION_PRESS_EVENT  = 'StickyNotification_onActionPress';
+const SERVICE_STOP_EVENT  = 'StickyNotification_onServiceStop';
 
 // DeviceEventEmitter is used instead of NativeEventEmitter(module) for two reasons:
 //  1. NativeEventEmitter forces the TurboModule to load at import time, which can
@@ -428,7 +448,6 @@ export const StickyNotification = {
     callback: (event: ActionPressEvent) => void
   ): EmitterSubscription {
     if (Platform.OS !== 'android') {
-      // Return a no-op subscription on unsupported platforms
       return { remove: () => {} } as EmitterSubscription;
     }
     return DeviceEventEmitter.addListener(ACTION_PRESS_EVENT, (event) =>
@@ -436,10 +455,40 @@ export const StickyNotification = {
     );
   },
 
-  /** Remove all active action listeners at once. */
+  /**
+   * Subscribe to service-stop events.
+   *
+   * The callback fires whenever the foreground service terminates, with a
+   * `reason` field indicating how it stopped (`MANUAL_STOP`, `SWIPE_DISMISS`,
+   * or `SYSTEM_KILLED`).
+   *
+   * Returns an `EmitterSubscription` — call `.remove()` on it to unsubscribe.
+   *
+   * @example
+   * ```ts
+   * const sub = StickyNotification.addServiceStopListener(({ reason }) => {
+   *   console.log('Service stopped:', reason);
+   * });
+   * // later:
+   * sub.remove();
+   * ```
+   */
+  addServiceStopListener(
+    callback: (event: ServiceStopEvent) => void
+  ): EmitterSubscription {
+    if (Platform.OS !== 'android') {
+      return { remove: () => {} } as EmitterSubscription;
+    }
+    return DeviceEventEmitter.addListener(SERVICE_STOP_EVENT, (event) =>
+      callback(event as ServiceStopEvent)
+    );
+  },
+
+  /** Remove all active action listeners and service-stop listeners at once. */
   removeAllListeners(): void {
     if (Platform.OS === 'android') {
       DeviceEventEmitter.removeAllListeners(ACTION_PRESS_EVENT);
+      DeviceEventEmitter.removeAllListeners(SERVICE_STOP_EVENT);
     }
   },
 };
