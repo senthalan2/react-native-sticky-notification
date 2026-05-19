@@ -101,6 +101,10 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
     promise.resolve(StickyNotificationService.isRunning)
   }
 
+  override fun canSwipeDismiss(promise: Promise) {
+    promise.resolve(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+  }
+
   // ─── NativeEventEmitter stubs ─────────────────────────────────────────────
 
   override fun addListener(eventName: String) {}

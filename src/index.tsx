@@ -427,6 +427,22 @@ export const StickyNotification = {
   },
 
   /**
+   * Returns `true` when the device runs Android 14+ (API 34), where the
+   * system allows users to swipe away foreground service notifications even
+   * when `ongoing` is `true`.
+   *
+   * Use this to decide whether to show a UI hint warning the user that the
+   * notification can be dismissed, or to decide whether `repostOnDismiss`
+   * needs to be enabled.
+   *
+   * Always returns `false` on iOS.
+   */
+  canSwipeDismiss(): Promise<boolean> {
+    if (Platform.OS !== 'android') return Promise.resolve(false);
+    return NativeStickyNotification.canSwipeDismiss();
+  },
+
+  /**
    * Subscribe to action-button press events from the notification.
    *
    * The callback is called whenever the user taps an action button.

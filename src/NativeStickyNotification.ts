@@ -20,6 +20,13 @@ export interface Spec extends TurboModule {
   /** Returns true when the foreground service is currently running. */
   isServiceRunning(): Promise<boolean>;
 
+  /**
+   * Returns true when the device runs Android 14+ (API 34), where the system
+   * allows users to swipe away foreground service notifications even when
+   * ongoing is true.
+   */
+  canSwipeDismiss(): Promise<boolean>;
+
   // Required by NativeEventEmitter
   addListener(eventName: string): void;
   removeListeners(count: number): void;

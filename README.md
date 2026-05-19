@@ -14,11 +14,13 @@ A production-ready, fully typed, and deeply customizable React Native library fo
 
 - **Rock-Solid Event Delivery**: Action taps reach your JS listener whether the app is in the foreground, background, or was just cold-started from a killed state. Events are persisted in `SharedPreferences` and replayed on resume — zero taps are lost.
 
+- **Service Stop Events**: Get notified whenever the foreground service stops, regardless of the reason — explicit JS call (`MANUAL_STOP`), user swipe (`SWIPE_DISMISS`), or system kill (`SYSTEM_KILLED`). The same retry/queue mechanism used for action events ensures delivery even if the bridge wasn't ready at the moment of termination.
+
 - **New Architecture Ready**: Fully compatible with React Native 0.73+ TurboModules and the New Architecture. A deferred `Handler`-based drain with retry back-off ensures events are never emitted into an uninitialised bridge.
 
-- **Deep Visual Customisation**: Control every colour and shape — title, body text, divider, action labels, icon tints, button backgrounds, and border radius — globally or per-button.
+- **Deep Visual Customisation**: Control every colour and shape — title, body text, divider, action labels, icon tints, button backgrounds, and border radius — globally or per-button. Add an optional footer text below action buttons with per-word and per-character colour overrides.
 
-- **Smart Dismiss Handling**: On Android 14+, where users can swipe away foreground notifications, the library re-posts the notification instantly via a `deleteIntent` to keep it truly sticky. Toggle this on or off with `repostOnDismiss`.
+- **Smart Dismiss Handling**: On Android 14+, where users can swipe away foreground notifications, the library fires a `SWIPE_DISMISS` event and optionally re-posts the notification instantly. Toggle reposting on or off with `repostOnDismiss`.
 
 - **Panel & App Control**: Choose whether tapping an action collapses the notification panel (`closeOnAction`) and/or brings your app to the foreground (`openAppOnAction`). A transparent trampoline Activity handles both reliably on all Android versions including API 29+ Background Activity Launch restrictions.
 
@@ -96,17 +98,29 @@ StickyNotification.startService({ title: 'My App', smallIcon: 'ic_notification' 
 import React, { useEffect, useRef } from 'react';
 import { View, Button } from 'react-native';
 import StickyNotification from 'react-native-sticky-notification';
-import type { ActionPressEvent } from 'react-native-sticky-notification';
+import type { ActionPressEvent, ServiceStopEvent } from 'react-native-sticky-notification';
 
 export default function App() {
-  const sub = useRef<{ remove: () => void } | null>(null);
+  const actionSub  = useRef<{ remove: () => void } | null>(null);
+  const stopSub    = useRef<{ remove: () => void } | null>(null);
 
   useEffect(() => {
-    sub.current = StickyNotification.addActionListener((event: ActionPressEvent) => {
+    // Listen for action button taps
+    actionSub.current = StickyNotification.addActionListener((event: ActionPressEvent) => {
       console.log('Action pressed:', event.actionId, event.payload);
       if (event.actionId === 'stop') StickyNotification.stopService();
     });
-    return () => sub.current?.remove();
+
+    // Listen for service stop events
+    stopSub.current = StickyNotification.addServiceStopListener((event: ServiceStopEvent) => {
+      console.log('Service stopped, reason:', event.reason);
+      // event.reason is 'MANUAL_STOP' | 'SWIPE_DISMISS' | 'SYSTEM_KILLED'
+    });
+
+    return () => {
+      actionSub.current?.remove();
+      stopSub.current?.remove();
+    };
   }, []);
 
   const start = () =>
@@ -117,8 +131,8 @@ export default function App() {
       color: '#1DB954',
       actions: [
         { id: 'prev',  title: 'Prev',  icon: 'ic_skip_previous' },
-        { id: 'pause', title: 'Pause', icon: 'ic_pause'          },
-        { id: 'next',  title: 'Next',  icon: 'ic_skip_next'      },
+        { id: 'pause', title: 'Pause', icon: 'ic_pause'         },
+        { id: 'next',  title: 'Next',  icon: 'ic_skip_next'     },
       ],
     });
 
@@ -189,11 +203,11 @@ StickyNotification.startService({
   showDivider: false,
   buttonsPerRow: 5,
   actions: [
-    { id: 'home',     title: 'Home'     },
-    { id: 'search',   title: 'Search'   },
-    { id: 'add',      title: 'Add'      },
+    { id: 'home',     title: 'Home'       },
+    { id: 'search',   title: 'Search'     },
+    { id: 'add',      title: 'Add'        },
     { id: 'fav',      title: 'Favourites' },
-    { id: 'settings', title: 'Settings' },
+    { id: 'settings', title: 'Settings'   },
   ],
 });
 ```
@@ -217,11 +231,11 @@ StickyNotification.startService({
 
   // Expanded view — same or richer set of actions
   actions: [
-    { id: 'prev',    title: 'Prev',     icon: 'ic_skip_previous' },
-    { id: 'pause',   title: 'Pause',    icon: 'ic_pause'         },
-    { id: 'next',    title: 'Next',     icon: 'ic_skip_next'     },
-    { id: 'shuffle', title: 'Shuffle',  icon: 'ic_shuffle'       },
-    { id: 'repeat',  title: 'Repeat',   icon: 'ic_repeat'        },
+    { id: 'prev',    title: 'Prev',    icon: 'ic_skip_previous' },
+    { id: 'pause',   title: 'Pause',   icon: 'ic_pause'         },
+    { id: 'next',    title: 'Next',    icon: 'ic_skip_next'     },
+    { id: 'shuffle', title: 'Shuffle', icon: 'ic_shuffle'       },
+    { id: 'repeat',  title: 'Repeat',  icon: 'ic_repeat'        },
   ],
 });
 ```
@@ -242,19 +256,27 @@ StickyNotification.startService({
 
 > **Killed state**: When the app process is not running, tapping any action always opens the app regardless of `openAppOnAction`.
 
-### 4. Sticky Notification on Android 14+
+### 5. Sticky Notification on Android 14+
 
-Android 14 allows users to swipe foreground service notifications away. Enable `repostOnDismiss` (default: `true`) to make the notification immediately reappear:
+Android 14 allows users to swipe foreground service notifications away. `repostOnDismiss` (default `true`) controls whether the notification reappears, and the new `addServiceStopListener` lets you react to the swipe:
 
 ```ts
 StickyNotification.startService({
   title: 'Background Sync',
-  repostOnDismiss: true,   // default — notification reappears immediately after swipe
+  repostOnDismiss: true,   // notification reappears immediately after swipe (default)
   // repostOnDismiss: false  // allow user to hide it temporarily
+});
+
+StickyNotification.addServiceStopListener(({ reason }) => {
+  if (reason === 'SWIPE_DISMISS') {
+    console.log('User swiped the notification away');
+    // repostOnDismiss: true  → notification will reappear automatically
+    // repostOnDismiss: false → notification stays gone, you can restart manually
+  }
 });
 ```
 
-### 5. More Than 5 Buttons Across Multiple Rows
+### 6. More Than 5 Buttons Across Multiple Rows
 
 ```ts
 StickyNotification.startService({
@@ -267,7 +289,7 @@ StickyNotification.startService({
 });
 ```
 
-### 6. Passing Data Through Action Payloads
+### 7. Passing Data Through Action Payloads
 
 ```ts
 StickyNotification.startService({
@@ -290,7 +312,7 @@ StickyNotification.addActionListener(({ actionId, payload }) => {
 });
 ```
 
-### 7. Live Update Without Flicker
+### 8. Live Update Without Flicker
 
 ```ts
 // Update text and buttons in-place — no service restart, no visual flash
@@ -304,7 +326,7 @@ await StickyNotification.updateNotification({
 });
 ```
 
-### 8. Navigate to a Screen from an Action
+### 9. Navigate to a Screen from an Action
 
 ```tsx
 import { NavigationContainerRef } from '@react-navigation/native';
@@ -318,6 +340,104 @@ StickyNotification.addActionListener(({ actionId }) => {
 });
 ```
 
+### 10. Footer Text with Color Customization
+
+Add an optional centered text line below the action buttons. Supports three levels of color override, applied in priority order (highest wins):
+
+```
+footerLetterColors  >  footerWordColors  >  footerTextColor
+```
+
+```ts
+StickyNotification.startService({
+  title: 'Kansas Station',
+  actions: [
+    { id: 'prepay',    title: 'Prepay',    icon: 'ic_prepay'    },
+    { id: 'postpay',   title: 'Postpay',   icon: 'ic_postpay'   },
+    { id: 'dth',       title: 'DTH',       icon: 'ic_dth'       },
+    { id: 'landline',  title: 'Landline',  icon: 'ic_landline'  },
+    { id: 'broadband', title: 'Broadband', icon: 'ic_broadband' },
+  ],
+
+  // Footer text — displayed centered below the action buttons
+  footerText: 'Manage your services',
+
+  // 1. Full text color (lowest priority — fallback for unstyled characters)
+  footerTextColor: '#888888',
+
+  // 2. Word-level colors (override footerTextColor for matched words)
+  footerWordColors: [
+    { word: 'Manage',   color: '#FF5722' },
+    { word: 'services', color: '#1DB954' },
+  ],
+
+  // 3. Per-character colors by index (highest priority — overrides everything)
+  //    Index is zero-based position in footerText.
+  //    "Manage your services"
+  //     01234567890123456789
+  footerLetterColors: [
+    { index: 0, color: '#FF0000' },  // 'M' → red
+    { index: 1, color: '#FF7700' },  // 'a' → orange
+    { index: 2, color: '#FFFF00' },  // 'n' → yellow
+    { index: 3, color: '#00FF00' },  // 'a' → green
+    { index: 4, color: '#0000FF' },  // 'g' → blue
+    { index: 5, color: '#8B00FF' },  // 'e' → violet
+  ],
+});
+```
+
+> **Priority rules**
+> - A `footerLetterColors` entry at index `i` overrides any word color covering that position and the full text color.
+> - A `footerWordColors` entry overrides `footerTextColor` for every character of the matched word (all occurrences).
+> - `footerTextColor` is the uniform default applied to characters not covered by either of the above.
+> - All three props are optional and can be combined freely.
+
+### 11. Service Stop Listener — All Scenarios
+
+```tsx
+import React, { useEffect, useRef } from 'react';
+import StickyNotification from 'react-native-sticky-notification';
+import type { ServiceStopEvent } from 'react-native-sticky-notification';
+
+export default function App() {
+  const stopSub = useRef<{ remove: () => void } | null>(null);
+
+  useEffect(() => {
+    stopSub.current = StickyNotification.addServiceStopListener(
+      ({ reason }: ServiceStopEvent) => {
+        switch (reason) {
+          case 'MANUAL_STOP':
+            // stopService() was called from JS — this is intentional.
+            console.log('Service stopped by the app.');
+            break;
+
+          case 'SWIPE_DISMISS':
+            // User swiped the notification on Android 14+.
+            // If repostOnDismiss: true (default), the notification will
+            // reappear automatically — the service keeps running.
+            // If repostOnDismiss: false, the notification is gone but the
+            // service is still running; restart the notification if needed.
+            console.log('Notification dismissed by user swipe.');
+            break;
+
+          case 'SYSTEM_KILLED':
+            // Android terminated the service unexpectedly (OOM killer,
+            // user force-stopped app, etc.).
+            console.log('Service killed by the system.');
+            break;
+        }
+      }
+    );
+
+    return () => stopSub.current?.remove();
+  }, []);
+
+  // ...
+}
+```
+
+> **Delivery guarantee** — `SWIPE_DISMISS` and `MANUAL_STOP` are delivered with the same retry/queue mechanism as action-press events. `SYSTEM_KILLED` is a best-effort delivery: if the module is available when `onDestroy` fires the event is emitted; if the entire process is being killed simultaneously the event may not reach JS in that run but will be queued for the next app launch.
+
 ---
 
 ## 📚 Methods
@@ -325,11 +445,13 @@ StickyNotification.addActionListener(({ actionId }) => {
 | Method | Returns | Description |
 |---|---|---|
 | `startService(options)` | `Promise<void>` | Start the foreground service and show the notification. Channel is created automatically. |
-| `stopService()` | `Promise<void>` | Stop the service and remove the notification. Safe to call when not running. |
+| `stopService()` | `Promise<void>` | Stop the service and remove the notification. Safe to call when not running. Triggers a `MANUAL_STOP` event on all active stop listeners. |
 | `updateNotification(options)` | `Promise<void>` | Update notification content in-place. Supply only the keys you want to change. |
 | `isServiceRunning()` | `Promise<boolean>` | `true` when the service is active. Always `false` on iOS. |
+| `canSwipeDismiss()` | `Promise<boolean>` | `true` when the device runs Android 14+ (API 34), where foreground service notifications are swipe-dismissable regardless of the `ongoing` flag. Always `false` on iOS. |
 | `addActionListener(callback)` | `EmitterSubscription` | Subscribe to action-button tap events. Call `.remove()` on unmount. |
-| `removeAllListeners()` | `void` | Remove every active action listener at once. |
+| `addServiceStopListener(callback)` | `EmitterSubscription` | Subscribe to service-stop events (`MANUAL_STOP`, `SWIPE_DISMISS`, `SYSTEM_KILLED`). Call `.remove()` on unmount. |
+| `removeAllListeners()` | `void` | Remove every active action listener and service-stop listener at once. |
 
 ---
 
@@ -367,7 +489,7 @@ StickyNotification.addActionListener(({ actionId }) => {
 | `priority` | `'min' \| 'low' \| 'default' \| 'high' \| 'max'` | `"default"` | Notification importance / priority. |
 | `ongoing` | `boolean` | `true` | Prevent the user from swiping the notification away (pre-Android 14). |
 | `autoCancel` | `boolean` | `false` | Dismiss notification when the user taps its body. |
-| `repostOnDismiss` | `boolean` | `true` | On Android 14+, where foreground service notifications can be swiped, immediately re-post the notification after dismissal to keep it truly sticky. Set to `false` to allow temporary hiding. |
+| `repostOnDismiss` | `boolean` | `true` | On Android 14+, immediately re-post the notification after the user swipes it away so it stays visible. Set to `false` to allow temporary hiding. A `SWIPE_DISMISS` event is always fired on swipe regardless of this setting. |
 | `openAppOnAction` | `boolean` | `false` | Bring the app to the foreground whenever any action button is tapped. When the app process is killed, the app always opens regardless of this prop. |
 | `closeOnAction` | `boolean` | `false` | Collapse the notification panel when any action button is tapped. Implemented via a transparent trampoline Activity — the only reliable cross-version mechanism on Android 10+. |
 
@@ -424,10 +546,26 @@ These apply to **all** action buttons. Individual buttons can override colours a
 | `actionIconTint` | `string` | None | Hex tint applied to every button's icon via a `SRC_ATOP` colour filter. No effect on icon-less buttons. |
 | `actionBackground` | `string` | None | Hex background colour for each individual button. |
 | `actionBorderRadius` | `number` | `0` | Corner radius in dp for button backgrounds. Set to a large value (e.g. `100`) for a pill/capsule shape. Requires `actionBackground` to be visible. |
-| `actionSpacing` | `number` | `0` | Horizontal padding added to the **left and right** of every button, in dp. Creates a visible gap between adjacent buttons. The background (including border radius) is drawn inside the padded area, so pill/rounded buttons appear as separate chips. Example: `actionSpacing: 6` → 6 dp on each side → 12 dp gap between two adjacent buttons. |
+| `actionSpacing` | `number` | `0` | Gap between adjacent buttons in dp. Applied as right-side padding on every button except the last, so the first button aligns flush with the container edge and there is no trailing space after the last button. Example: `actionSpacing: 6` → 12 dp gap between each pair of adjacent buttons, zero outer margin. |
 | `rowSpacing` | `number` | `0` | Vertical padding added **above and below** each row of buttons, in dp. Creates a visible gap between rows when there are multiple rows. Example: `rowSpacing: 4` → 4 dp above and below each row → 8 dp gap between rows. |
-| `actionIconSpacing` | `number` | `2` | Vertical gap in dp between the icon and the label text inside each button. Only applies to buttons that have an icon; buttons without an icon are unaffected. |
+| `actionIconSpacing` | `number` | `2` | Vertical gap in dp between the icon and the label text inside each button. Only applies to buttons that have an icon. |
 | `actionsContainerBackground` | `string` | None | Hex background colour for the entire button strip container. |
+
+### 📄 Footer Text
+
+An optional text line rendered below the action buttons, always centered horizontally. Supports three levels of color customization applied with explicit priority.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `footerText` | `string` | — | Text displayed centered below the action buttons. Hidden when absent or empty. |
+| `footerTextColor` | `string` | System default | Uniform colour for the entire footer text. Lowest priority — overridden by `footerWordColors` and `footerLetterColors` where they apply. |
+| `footerWordColors` | `Array<{ word: string; color: string }>` | — | Per-word colour overrides. Every occurrence of each `word` in the footer string is coloured with its `color`. Overrides `footerTextColor`; overridden by `footerLetterColors`. |
+| `footerLetterColors` | `Array<{ index: number; color: string }>` | — | Per-character colour overrides. `index` is the zero-based character position in `footerText`. Highest priority — overrides both `footerTextColor` and `footerWordColors` at that position. |
+
+**Color priority (highest → lowest):**
+```
+footerLetterColors[i]  >  footerWordColors (word match)  >  footerTextColor
+```
 
 ---
 
@@ -455,6 +593,35 @@ interface NotificationAction {
   background?: string;
   /** Corner radius in dp for this button's background. Overrides global actionBorderRadius. */
   borderRadius?: number;
+}
+```
+
+### `ActionPressEvent`
+
+```typescript
+interface ActionPressEvent {
+  /** The `id` of the tapped NotificationAction. */
+  actionId: string;
+  /** The `payload` string from the NotificationAction, if provided. */
+  payload?: string;
+}
+```
+
+### `ServiceStopEvent`
+
+```typescript
+interface ServiceStopEvent {
+  /**
+   * Why the service stopped:
+   *
+   * - "MANUAL_STOP"   — stopService() was called explicitly from JS.
+   * - "SWIPE_DISMISS" — the user swiped the notification away (Android 14+).
+   *                     If repostOnDismiss is true the notification reappears
+   *                     automatically and the service keeps running.
+   * - "SYSTEM_KILLED" — Android terminated the service unexpectedly
+   *                     (OOM killer, user force-stopped the app, etc.).
+   */
+  reason: 'MANUAL_STOP' | 'SWIPE_DISMISS' | 'SYSTEM_KILLED';
 }
 ```
 
@@ -519,17 +686,12 @@ interface StickyNotificationOptions {
   rowSpacing?: number;
   actionIconSpacing?: number;
   actionsContainerBackground?: string;
-}
-```
 
-### `ActionPressEvent`
-
-```typescript
-interface ActionPressEvent {
-  /** The `id` of the tapped NotificationAction. */
-  actionId: string;
-  /** The `payload` string from the NotificationAction, if provided. */
-  payload?: string;
+  // Footer text
+  footerText?: string;
+  footerTextColor?: string;
+  footerWordColors?: Array<{ word: string; color: string }>;
+  footerLetterColors?: Array<{ index: number; color: string }>;
 }
 ```
 
@@ -570,13 +732,21 @@ StickyNotification.startService({
 
 | App state | Delivery mechanism |
 |---|---|
-| **Foreground** | Receiver → module static reference → `DeviceEventEmitter` |
+| **Foreground** | Service/Receiver → module static reference → `DeviceEventEmitter` |
 | **Background** (process alive) | Same path; event is queued until JS layer resumes |
-| **Killed / cold start** | Receiver writes event to `SharedPreferences`; app is launched; module reads and emits in `onHostResume()` |
+| **Killed / cold start** | Receiver writes action event to `SharedPreferences`; app is launched; module reads and emits in `onHostResume()` |
 
-**Retry logic** — on New Architecture, `onHostResume` fires before the JS bundle finishes loading. The module defers the first emit by 150 ms and retries up to 8 times with a 250 ms back-off until the bridge accepts the call.
+**Retry logic** — on New Architecture, `onHostResume` fires before the JS bundle finishes loading. The module defers the first emit by 150 ms and retries up to 8 times with a 250 ms back-off until the bridge accepts the call. Both action-press and service-stop events share this retry queue.
 
 **Force-stop** — when the user force-stops the app from Android Settings, both the service and the notification are removed immediately. No delivery is expected after a force-stop.
+
+### Service stop event reliability
+
+| Stop reason | Reliability |
+|---|---|
+| `MANUAL_STOP` | **Guaranteed** — emitted synchronously before the service tears down, while the bridge is always ready. |
+| `SWIPE_DISMISS` | **Reliable** — emitted as soon as the `deleteIntent` fires. Queued and retried if the bridge is not yet ready. |
+| `SYSTEM_KILLED` | **Best-effort** — emitted inside `onDestroy`. Delivered when the module instance is still alive; may not reach JS in the same process run if the entire process is being killed simultaneously. |
 
 ---
 
@@ -598,16 +768,17 @@ buttonsPerRow: 5, 7 actions → 2 rows
 ├ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤  ← showDivider
 │ [Btn1] [Btn2] [Btn3] [Btn4] [Btn5]     │  ← row 1   ↕ rowSpacing
 │       [Btn6] [Btn7]                     │  ← row 2
+│         Footer text (centered)          │  ← footerText (optional)
 └─────────────────────────────────────────┘
-       ↑←actionSpacing→↑
-         gap between buttons
+  ↑ flush  ↑←─actionSpacing─→↑  flush ↑
+           gap between buttons
 ```
 
 ### Spacing props at a glance
 
 | Prop | Controls | Visual effect |
 |---|---|---|
-| `actionSpacing` | Left + right padding on each button | Gap between adjacent buttons in the same row |
+| `actionSpacing` | Right-side padding between buttons | Equal gap between every pair of adjacent buttons; first and last buttons align flush with the container edge |
 | `rowSpacing` | Top + bottom padding on each row | Gap between rows |
 | `actionIconSpacing` | Top padding on the label inside each button | Gap between icon and label text (icon-bearing buttons only) |
 
@@ -616,7 +787,7 @@ buttonsPerRow: 5, 7 actions → 2 rows
 StickyNotification.startService({
   actionBorderRadius: 100,
   actionBackground: '#2A2A2A',
-  actionSpacing: 6,    // 12 dp gap between adjacent buttons
+  actionSpacing: 6,    // 12 dp gap between adjacent buttons, flush to edges
   rowSpacing: 4,       // 8 dp gap between rows
   actions: [...],
 });
@@ -659,7 +830,7 @@ const running = await StickyNotification.isServiceRunning();     // always false
 
 **Channel settings are user-controlled after creation** — Importance, sound, and vibration are locked to the user's preference once a channel is created. Use a new `channelId` to change importance programmatically.
 
-**Android 14+ swipe behaviour** — The system allows users to dismiss foreground service notifications. `repostOnDismiss: true` (default) re-posts immediately via `deleteIntent`. Set it to `false` to allow temporary dismissal.
+**Android 14+ swipe behaviour** — The system allows users to dismiss foreground service notifications. `repostOnDismiss: true` (default) re-posts immediately via `deleteIntent`. Set it to `false` to allow temporary dismissal. A `SWIPE_DISMISS` event is always fired on swipe regardless of this setting.
 
 **Force-stop clears everything** — A user force-stop from Android Settings removes the service, notification, and any pending SharedPreferences events immediately.
 
