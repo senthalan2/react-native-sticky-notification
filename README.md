@@ -590,41 +590,43 @@ This section covers every aspect of the library that intersects with Google Play
 
 | Feature | Status | Reason |
 |---|---|---|
-| Foreground service with visible notification | ✅ Allowed | Tied to an active, user-started operation |
-| Unlimited action buttons via `RemoteViews` | ✅ Allowed | Standard Android API, no policy restrictions |
-| `POST_NOTIFICATIONS` runtime permission | ✅ Allowed | Declared correctly; must be requested with rationale |
-| `closeOnAction` trampoline activity | ✅ Allowed | Launching an Activity from a notification is the recommended pattern |
-| `openAppOnAction` | ✅ Allowed | Bringing an app to foreground from a notification the user tapped is explicitly permitted |
-| Killed-state event delivery via `SharedPreferences` | ✅ Allowed | Standard pattern used by all major notification libraries |
-| `START_STICKY` service restart | ✅ Allowed | Standard Android foreground service contract |
+| Foreground service with visible notification | ✅ | Tied to an active, user-started operation |
+| Unlimited action buttons via `RemoteViews` | ✅ | Standard Android API, no policy restrictions |
+| `POST_NOTIFICATIONS` runtime permission | ✅ | Declared correctly; must be requested with rationale |
+| `closeOnAction` trampoline activity | ✅ | Launching an Activity from a notification is the recommended pattern |
+| `openAppOnAction` | ✅ | Bringing an app to foreground from a notification the user tapped is explicitly permitted |
+| Killed-state delivery via `SharedPreferences` | ✅ | Standard pattern used by all major notification libraries |
+| `START_STICKY` service restart | ✅ | Standard Android foreground service contract |
 
 ---
 
 ### ⚠️ Areas that need your attention
 
-#### 1. Foreground Service Type — `dataSync` vs your actual use case
+#### 1. Foreground Service Type — choose the type that matches your app
 
-The library declares `foregroundServiceType="dataSync"` in its manifest. **Google Play requires the declared service type to accurately describe what your service actually does.** Using the wrong type can result in your app being rejected or removed.
+The library declares `foregroundServiceType="dataSync"` in its manifest. **Google Play requires the declared type to accurately describe what your service actually does.** Using the wrong type can cause rejection or removal.
 
-| Your use case | Correct `foregroundServiceType` |
-|---|---|
-| Music / audio / video playback | `mediaPlayback` |
-| Turn-by-turn navigation, live location | `location` |
-| Active phone / video call | `phoneCall` |
-| File upload / download, data sync | `dataSync` ✅ (library default) |
-| Camera or microphone recording | `camera` / `microphone` |
-| Connected device (Bluetooth, USB) | `connectedDevice` |
-| Health / fitness tracking | `health` |
+| App category | Use case | Correct `foregroundServiceType` |
+|---|---|---|
+| 💳 **Fintech / Banking** | Quick pay, transfer, balance check, transactions | **`dataSync`** ✅ library default — no change needed |
+| 🎵 Music / Podcast | Audio playback controls | `mediaPlayback` |
+| 🗺️ Navigation / Delivery | Turn-by-turn, live location | `location` |
+| 📞 VoIP / Calling | Active phone or video call | `phoneCall` |
+| 📁 File Manager / Cloud | Upload / download progress | `dataSync` ✅ |
+| 🏋️ Fitness / Health | Workout tracking, step counter | `health` |
+| 📷 Camera / Recording | Camera or microphone in use | `camera` / `microphone` |
+| 🔵 IoT / Wearables | Bluetooth or USB device | `connectedDevice` |
 
-**Override the service type** in your app's `AndroidManifest.xml` using manifest merger `tools:replace`:
+> **Fintech apps:** Every action in a financial quick-panel (payment initiation, balance refresh, transaction history) is a network call that reads from or writes to a remote financial server — that is precisely the definition of `dataSync`. **The library default is correct for Fintech. No manifest override is needed.**
+
+If your app falls into a category that requires a different type, override it in your app's `AndroidManifest.xml`:
 
 ```xml
-<!-- Add xmlns:tools to your manifest root if not already present -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-  <!-- Override the service type declared by the library -->
   <application>
+    <!-- Example: override to mediaPlayback for a music player -->
     <service
       android:name="com.stickynotification.StickyNotificationService"
       android:foregroundServiceType="mediaPlayback"
@@ -634,34 +636,36 @@ The library declares `foregroundServiceType="dataSync"` in its manifest. **Googl
 </manifest>
 ```
 
-Also declare the matching permission in your app manifest:
+And declare the matching permission:
 
 ```xml
-<!-- mediaPlayback example -->
+<!-- mediaPlayback -->
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-<!-- location example -->
+<!-- location -->
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+<!-- health -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
 ```
 
-> **Note:** `FOREGROUND_SERVICE_DATA_SYNC` is already declared by the library. If you switch to a different service type, remove the `dataSync` permission from your app or add a `tools:remove` override to avoid an unnecessary permission declaration.
+> `FOREGROUND_SERVICE_DATA_SYNC` is already declared by the library. If you switch to a different type, add `tools:remove="android:name"` for the `dataSync` permission or it will remain as an unused declared permission.
 
 ---
 
 #### 2. `repostOnDismiss` — use responsibly
 
-Android 14 deliberately gave users the ability to swipe away foreground service notifications. Setting `repostOnDismiss: true` (the library default) immediately re-posts the notification after the user swipes it, effectively overriding that user control.
+Android 14 deliberately gave users the ability to swipe away foreground service notifications. Setting `repostOnDismiss: true` (the library default) immediately re-posts the notification after the user swipes it, effectively overriding that control.
 
-Google Play's **Device and Network Abuse policy** prohibits apps from "circumventing system processes or controls." Re-posting is generally acceptable for services where the notification is functionally necessary (media player transport controls, live navigation), but it may be flagged for apps where the notification is primarily informational or promotional.
-
-**Guideline:**
+Google Play's **Device and Network Abuse policy** prohibits apps from "circumventing system processes or controls." Re-posting is acceptable when the notification provides real-time interactive functionality the user needs; it is not acceptable for purely informational or promotional content.
 
 | Scenario | Recommendation |
 |---|---|
-| Music player — user needs notification to pause/skip | `repostOnDismiss: true` ✅ |
-| Navigation — user needs turn-by-turn visible | `repostOnDismiss: true` ✅ |
-| Download progress — informational only | `repostOnDismiss: false` ✅ |
-| Fitness tracker step count — informational | `repostOnDismiss: false` ✅ |
+| 💳 Fintech quick-actions panel — user needs it to initiate transactions | `repostOnDismiss: true` ✅ |
+| 🎵 Music player — user needs transport controls visible | `repostOnDismiss: true` ✅ |
+| 🗺️ Navigation — turn-by-turn must stay visible | `repostOnDismiss: true` ✅ |
+| 📁 Download progress — informational only | `repostOnDismiss: false` ✅ |
+| 🏋️ Step counter — informational only | `repostOnDismiss: false` ✅ |
 | Any advertising or promotional content | `repostOnDismiss: false` — required |
 
 ---
@@ -671,51 +675,69 @@ Google Play's **Device and Network Abuse policy** prohibits apps from "circumven
 Google Play requires that runtime permission requests are preceded by an explanation of why the permission is needed. Show a rationale dialog **before** calling `PermissionsAndroid.request` if the user has previously denied the permission:
 
 ```tsx
-const granted = await PermissionsAndroid.check(
-  PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-);
-if (!granted) {
-  const shouldShowRationale = await PermissionsAndroid.shouldShowRequestPermissionRationale(
+import { PermissionsAndroid, Platform } from 'react-native';
+
+async function ensureNotificationPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android' || Platform.Version < 33) return true;
+
+  const already = await PermissionsAndroid.check(
     PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
   );
-  if (shouldShowRationale) {
-    // Show your own UI explaining why notifications are needed
+  if (already) return true;
+
+  const needsRationale = await PermissionsAndroid.shouldShowRequestPermissionRationale(
+    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+  );
+  if (needsRationale) {
+    // Show your own dialog explaining why the notification is needed
+    // e.g. "We show a quick-actions panel so you can pay or check your
+    //       balance without opening the app."
     await showNotificationRationaleDialog();
   }
-  await PermissionsAndroid.request(
+
+  const result = await PermissionsAndroid.request(
     PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
   );
+  return result === PermissionsAndroid.RESULTS.GRANTED;
 }
 ```
 
 ---
 
-#### 4. Acceptable vs unacceptable use cases
+#### 4. Fintech-specific Play Store considerations
 
-Google Play's foreground service policy states that foreground services must "perform tasks that are noticeable to users" and must be "initiated by the user." The library is a tool — compliance depends entirely on how you use it.
+Financial apps are subject to Google Play's **Financial Services policy** in addition to the standard policies. Relevant points:
+
+- **Transparent purpose**: The Play Store listing must clearly state that the app displays a persistent notification panel for quick financial actions. Reviewers may check that the notification is non-deceptive and accurately reflects the app's functionality.
+- **No misleading UI**: The notification must not simulate system alerts, banking alerts from other institutions, or security warnings.
+- **User-initiated only**: The foreground service must only start when the user explicitly enables the quick-actions panel — not silently on app launch.
+- **Data security**: Action payloads transmitted through the notification (`payload` prop) are passed as plain strings in `SharedPreferences` when the app is in a killed state. **Do not put sensitive financial data (account numbers, tokens, amounts) in the `payload` field.** Use opaque identifiers instead.
+
+---
+
+#### 5. Acceptable vs unacceptable use cases
 
 | ✅ Acceptable | ❌ Not acceptable |
 |---|---|
-| Media player with transport controls | Advertising or promotional banners |
-| Active navigation / live location sharing | Spam notifications or re-engagement outside user intent |
-| Ongoing fitness / workout tracking | Keeping the app alive purely to collect analytics |
-| File download / upload with progress | Circumventing battery optimization without user consent |
-| VoIP call in progress | Any content that misleads or deceives the user |
+| Fintech quick-actions (pay, transfer, balance) | Advertising or promotional banners |
+| Media player transport controls | Spam or unsolicited re-engagement |
+| Active navigation / live location | Keeping the app alive purely to collect analytics |
+| File upload / download with progress | Circumventing battery optimization without consent |
+| VoIP call in progress | Content that misleads or impersonates system UI |
 | Real-time data sync the user initiated | Background activity the user did not start |
 
 ---
 
 ### 📋 Pre-submission checklist
 
-Before submitting to Google Play, verify:
-
-- [ ] `foregroundServiceType` in your manifest matches your actual use case
-- [ ] The matching `FOREGROUND_SERVICE_*` permission is declared
-- [ ] `POST_NOTIFICATIONS` is requested at runtime with a clear rationale
-- [ ] The foreground service is only started in response to a direct user action
-- [ ] `repostOnDismiss` is `false` (or justified) for informational-only notifications
-- [ ] Your Play Store listing description accurately describes the notification feature
-- [ ] If Google Play requires a video during review, record the notification appearing and action buttons working as part of a real user flow
+- [ ] `foregroundServiceType` matches your actual use case (Fintech → `dataSync` ✅ already set)
+- [ ] The matching `FOREGROUND_SERVICE_*` permission is declared (Fintech → `FOREGROUND_SERVICE_DATA_SYNC` ✅ already declared by the library)
+- [ ] `POST_NOTIFICATIONS` is requested at runtime with a clear user-facing rationale
+- [ ] The foreground service starts only in response to a direct user action — never silently on launch
+- [ ] `repostOnDismiss` is justified if `true` (quick-actions panels are justified; informational notifications are not)
+- [ ] No sensitive financial data is placed in the `payload` field of any `NotificationAction`
+- [ ] The Play Store listing description mentions the persistent notification feature
+- [ ] If Google Play requests a video during review, record the full flow: user enables the panel → notification appears → action button tapped → app responds
 
 ---
 
