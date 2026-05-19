@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Template for one horizontal row of action buttons.
+  Populated at runtime via RemoteViews.addView() in StickyNotificationHelper.
+  Each notification_action_button child uses layout_weight="1" so buttons
+  share the row width equally regardless of how many are in the row.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/action_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="52dp"
+    android:orientation="horizontal"
+    android:baselineAligned="false" />
