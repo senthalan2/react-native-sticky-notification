@@ -22,6 +22,20 @@ export interface NotificationAction {
    * Use it to carry route names, item IDs, or any JSON-serialised data.
    */
   payload?: string;
+
+  // ── Per-button styling (overrides the global action* props) ──────────────
+  /** Hex colour for this button's label text, e.g. "#FF5722". */
+  labelColor?: string;
+  /** Hex tint applied to this button's icon. Has no effect if no icon is set. */
+  iconTint?: string;
+  /** Hex background colour for this button's container. */
+  background?: string;
+  /**
+   * Corner radius for this button's background, in dp.
+   * Overrides the global `actionBorderRadius` for this button only.
+   * Set to a very large value (e.g. 100) for a pill / capsule shape.
+   */
+  borderRadius?: number;
 }
 
 /**
@@ -51,9 +65,15 @@ export interface StickyNotificationOptions {
   // ── Content ──────────────────────────────────────────────────────────────
   /** Bold title line (required). */
   title: string;
-  /** Body text shown below the title. */
+  /**
+   * Body text shown below the title.
+   * Hidden automatically when absent or empty — no blank-line artefact.
+   */
   text?: string;
-  /** Sub-text shown in a smaller font below the body. */
+  /**
+   * Sub-text shown in a smaller font below the body.
+   * Hidden automatically when absent or empty.
+   */
   subText?: string;
 
   // ── Icons & colour ───────────────────────────────────────────────────────
@@ -134,6 +154,60 @@ export interface StickyNotificationOptions {
    * RemoteViews layout, bypassing Android's standard 3-action cap.
    */
   actions?: NotificationAction[];
+
+  // ── Divider ───────────────────────────────────────────────────────────────
+  /**
+   * Show the horizontal line between the text area and the action buttons.
+   * Set to `false` to hide it — useful when `text` is empty and the line
+   * would otherwise sit awkwardly right below the title.
+   * Default: true.
+   */
+  showDivider?: boolean;
+  /**
+   * Colour of the divider line.  Any CSS/Android hex string, e.g. "#33000000".
+   * Has no effect when `showDivider` is false.
+   */
+  dividerColor?: string;
+
+  // ── Text colours ─────────────────────────────────────────────────────────
+  /** Hex colour for the title text, e.g. "#FFFFFF". */
+  titleColor?: string;
+  /** Hex colour for the body text. */
+  textColor?: string;
+  /** Hex colour for the sub-text. */
+  subTextColor?: string;
+
+  // ── Action button styling ─────────────────────────────────────────────────
+  /**
+   * Hex colour applied to every action button's text label.
+   * Example: "#FFFFFF" for white labels.
+   */
+  actionLabelColor?: string;
+  /**
+   * Hex tint colour applied to every action button's icon image via a
+   * SRC_ATOP colour filter.  Has no effect on buttons without an icon.
+   */
+  actionIconTint?: string;
+  /**
+   * Hex background colour for each individual action button.
+   * Applied to the button's root container, so it covers the entire tap area.
+   */
+  actionBackground?: string;
+  /**
+   * Corner radius for action button backgrounds, in dp.
+   * Requires `actionBackground` to be set on the button (global or per-button)
+   * unless you only want rounded transparent clipping.
+   *
+   * Set to a very large value (e.g. 100) for a pill / capsule shape.
+   * Default: 0 (square corners).
+   */
+  actionBorderRadius?: number;
+  /**
+   * Hex background colour for the entire row-container that holds all the
+   * action buttons.  Use this to colour the strip as a whole while keeping
+   * individual buttons transparent.
+   */
+  actionsContainerBackground?: string;
 
   /**
    * Maximum number of action buttons to display.

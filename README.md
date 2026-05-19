@@ -1,74 +1,48 @@
-# react-native-sticky-notification
+# React Native Sticky Notification 🔔
 
-A production-ready React Native library for displaying a **persistent foreground-service notification** on Android with any number of interactive action buttons. Action taps are delivered reliably to the JavaScript layer regardless of whether the app is in the foreground, background, or has been restarted after a process death.
+A production-ready, fully typed, and deeply customizable React Native library for displaying a **persistent foreground-service notification** on Android with **unlimited interactive action buttons** — delivered reliably to JavaScript in every app state.
 
-> **Platform support:** Android only. An iOS stub is included so that shared code compiles without platform guards; all iOS methods resolve immediately or reject with `NOT_SUPPORTED`. See [iOS Limitations](#ios-limitations) for the nearest iOS alternatives.
-
----
-
-## Table of Contents
-
-1. [Features](#features)
-2. [Requirements](#requirements)
-3. [Installation](#installation)
-4. [Android Setup](#android-setup)
-5. [Usage](#usage)
-6. [API Reference](#api-reference)
-7. [TypeScript Types](#typescript-types)
-8. [Button Layout](#button-layout)
-9. [Event Delivery Across App States](#event-delivery-across-app-states)
-10. [Customisation](#customisation)
-11. [iOS Limitations](#ios-limitations)
-12. [Known Limitations](#known-limitations)
-13. [License](#license)
+[![npm version](https://img.shields.io/npm/v/react-native-sticky-notification.svg)](https://npmjs.com/package/react-native-sticky-notification)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
-## Features
+## ✨ Why this library?
 
-- Foreground service that survives the user pressing the Home button
-- **Unlimited action buttons** — uses a custom `RemoteViews` layout, bypassing Android's standard 3-button cap
-- Buttons laid out in configurable rows (`buttonsPerRow`, default 5)
-- Optional hard cap on displayed buttons (`maxButtons`)
-- Each action delivers a typed event to JS with an optional payload string
-- Silent, reliable event delivery in foreground, background, and after process restart
-- Notification channel auto-creation on Android 8+
-- Full visual customisation: title, body, sub-text, icons, accent colour, priority
-- TurboModule / New Architecture compatible (also works on the Old Architecture)
-- Zero additional native dependencies beyond React Native itself
+- **Unlimited Action Buttons**: Uses a custom `RemoteViews` layout to bypass Android's standard 3-button cap. Render any number of buttons in configurable rows — 5, 10, 20+.
 
----
+- **Rock-Solid Event Delivery**: Action taps reach your JS listener whether the app is in the foreground, background, or was just cold-started from a killed state. Events are persisted in `SharedPreferences` and replayed on resume — zero taps are lost.
 
-## Requirements
+- **New Architecture Ready**: Fully compatible with React Native 0.73+ TurboModules and the New Architecture. A deferred `Handler`-based drain with retry back-off ensures events are never emitted into an uninitialised bridge.
 
-| Item | Minimum |
-|------|---------|
-| React Native | 0.73+ |
-| Android SDK | 24 (Android 7.0) |
-| compileSdk / targetSdk | 34+ recommended |
-| Kotlin | 1.9+ |
+- **Deep Visual Customisation**: Control every colour and shape — title, body text, divider, action labels, icon tints, button backgrounds, and border radius — globally or per-button.
+
+- **Smart Dismiss Handling**: On Android 14+, where users can swipe away foreground notifications, the library re-posts the notification instantly via a `deleteIntent` to keep it truly sticky. Toggle this on or off with `repostOnDismiss`.
+
+- **Panel & App Control**: Choose whether tapping an action collapses the notification panel (`closeOnAction`) and/or brings your app to the foreground (`openAppOnAction`). A transparent trampoline Activity handles both reliably on all Android versions including API 29+ Background Activity Launch restrictions.
+
+- **Zero Native Dependencies**: No extra libraries. Everything is built on top of standard Android SDK APIs already bundled with React Native.
 
 ---
 
-## Installation
+## 📦 Installation
 
-```sh
-# npm
+```bash
 npm install react-native-sticky-notification
-
-# yarn
+# or
 yarn add react-native-sticky-notification
 ```
 
-React Native's [auto-linking](https://github.com/react-native-community/cli/blob/main/docs/autolinking.md) handles the rest. No manual `link` step is needed.
+React Native's [auto-linking](https://github.com/react-native-community/cli/blob/main/docs/autolinking.md) handles the rest — no manual `link` step needed.
 
 ---
 
-## Android Setup
+## 🔧 Android Setup
 
 ### 1. Permissions
 
-Add the following to your app's `android/app/src/main/AndroidManifest.xml` inside the `<manifest>` element, **above** the `<application>` block:
+Add the following to your app's `android/app/src/main/AndroidManifest.xml` inside the `<manifest>` block, **above** `<application>`:
 
 ```xml
 <!-- Always required -->
@@ -81,16 +55,15 @@ Add the following to your app's `android/app/src/main/AndroidManifest.xml` insid
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 ```
 
-### 2. Runtime notification permission (Android 13+)
+### 2. Runtime Notification Permission (Android 13+)
 
-On Android 13+ the user must grant `POST_NOTIFICATIONS` at runtime before a notification can appear. Use [`PermissionsAndroid`](https://reactnative.dev/docs/permissionsandroid) or a library such as `react-native-permissions`:
+On Android 13+ the user must grant `POST_NOTIFICATIONS` at runtime before any notification can appear:
 
 ```tsx
 import { PermissionsAndroid, Platform } from 'react-native';
 
 async function requestNotificationPermission(): Promise<boolean> {
   if (Platform.OS !== 'android' || Platform.Version < 33) return true;
-
   const result = await PermissionsAndroid.request(
     PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
   );
@@ -100,31 +73,24 @@ async function requestNotificationPermission(): Promise<boolean> {
 
 Call this before `StickyNotification.startService(...)`.
 
-### 3. No additional manifest entries
+### 3. No Extra Manifest Entries
 
-The library's own `AndroidManifest.xml` already declares the `<service>` and `<receiver>` entries through manifest merging. You do **not** need to copy them into your app manifest.
+The library's own `AndroidManifest.xml` already declares the `<service>`, `<receiver>`, and trampoline `<activity>` entries through manifest merging. You do **not** need to copy them into your app manifest.
 
-### 4. Notification icons
+### 4. Notification Icons
 
-Android requires the small notification icon to be a **white-on-transparent** vector or PNG drawable. Add your icon to `android/app/src/main/res/drawable/` and pass its resource name (without the extension) via `smallIcon`:
+Android requires the small status-bar icon to be a **white-on-transparent** vector or PNG drawable. Add it to `android/app/src/main/res/drawable/` and pass the resource name (without the extension):
 
 ```
 android/app/src/main/res/drawable/ic_notification.png
 ```
-
 ```ts
-StickyNotification.startService({
-  title: 'My App',
-  smallIcon: 'ic_notification',
-  // ...
-});
+StickyNotification.startService({ title: 'My App', smallIcon: 'ic_notification' });
 ```
 
 ---
 
-## Usage
-
-### Basic example
+## 💻 Quick Start
 
 ```tsx
 import React, { useEffect, useRef } from 'react';
@@ -133,127 +99,147 @@ import StickyNotification from 'react-native-sticky-notification';
 import type { ActionPressEvent } from 'react-native-sticky-notification';
 
 export default function App() {
-  const subscription = useRef<{ remove: () => void } | null>(null);
+  const sub = useRef<{ remove: () => void } | null>(null);
 
   useEffect(() => {
-    subscription.current = StickyNotification.addActionListener(
-      (event: ActionPressEvent) => {
-        console.log('Action pressed:', event.actionId, event.payload);
-
-        if (event.actionId === 'stop') {
-          StickyNotification.stopService();
-        }
-      }
-    );
-
-    return () => {
-      subscription.current?.remove();
-    };
+    sub.current = StickyNotification.addActionListener((event: ActionPressEvent) => {
+      console.log('Action pressed:', event.actionId, event.payload);
+      if (event.actionId === 'stop') StickyNotification.stopService();
+    });
+    return () => sub.current?.remove();
   }, []);
 
-  const start = async () => {
-    await StickyNotification.startService({
+  const start = () =>
+    StickyNotification.startService({
       title: 'Music Player',
       text: 'Now playing: Awesome Song',
       smallIcon: 'ic_notification',
       color: '#1DB954',
-      ongoing: true,
       actions: [
         { id: 'prev',  title: 'Prev',  icon: 'ic_skip_previous' },
-        { id: 'pause', title: 'Pause', icon: 'ic_pause' },
-        { id: 'next',  title: 'Next',  icon: 'ic_skip_next' },
+        { id: 'pause', title: 'Pause', icon: 'ic_pause'          },
+        { id: 'next',  title: 'Next',  icon: 'ic_skip_next'      },
       ],
     });
-  };
 
   return (
     <View>
-      <Button title="Start notification" onPress={start} />
-      <Button title="Stop notification"  onPress={() => StickyNotification.stopService()} />
+      <Button title="Start" onPress={start} />
+      <Button title="Stop"  onPress={() => StickyNotification.stopService()} />
     </View>
   );
 }
 ```
 
-### 5-button row (matches old package behaviour)
+---
+
+## 🎨 Advanced Examples
+
+### 1. Dark-Themed Player with Rounded Buttons
 
 ```ts
-await StickyNotification.startService({
-  title: 'Floating Toolbar',
-  text: 'Tap an action below',
+StickyNotification.startService({
+  title: 'Now Playing',
+  text: 'Awesome Song — Artist Name',
   smallIcon: 'ic_notification',
+  color: '#1DB954',
+
+  // Divider styling
+  showDivider: true,
+  dividerColor: '#333333',
+
+  // Text colours
+  titleColor: '#FFFFFF',
+  textColor: '#AAAAAA',
+
+  // Button container background
+  actionsContainerBackground: '#111111',
+
+  // Global button defaults
+  actionBorderRadius: 100,         // pill shape
+  actionBackground: '#2A2A2A',
+  actionLabelColor: '#FFFFFF',
+  actionIconTint: '#AAAAAA',
+
+  actions: [
+    { id: 'prev',  title: 'Prev',  icon: 'ic_skip_previous' },
+    {
+      id: 'play',
+      title: 'Play',
+      icon: 'ic_play_arrow',
+      background: '#1DB954',       // green pill for play button
+      labelColor: '#000000',
+      iconTint: '#000000',
+      borderRadius: 100,
+    },
+    { id: 'next',  title: 'Next',  icon: 'ic_skip_next' },
+  ],
+});
+```
+
+### 2. Notification Without Body Text
+
+When `text` is omitted the body row is hidden automatically — no empty gap. Hide the divider too for a clean look:
+
+```ts
+StickyNotification.startService({
+  title: 'Quick Actions',
+  showDivider: false,
   buttonsPerRow: 5,
   actions: [
-    { id: 'home',      title: 'Home',      icon: 'ic_home' },
-    { id: 'search',    title: 'Search',    icon: 'ic_search' },
-    { id: 'add',       title: 'Add',       icon: 'ic_add' },
-    { id: 'favorites', title: 'Favorites', icon: 'ic_favorite' },
-    { id: 'settings',  title: 'Settings',  icon: 'ic_settings' },
+    { id: 'home',     title: 'Home'     },
+    { id: 'search',   title: 'Search'   },
+    { id: 'add',      title: 'Add'      },
+    { id: 'fav',      title: 'Favourites' },
+    { id: 'settings', title: 'Settings' },
   ],
 });
 ```
 
-### More than 5 buttons across multiple rows
+### 3. Open App & Close Panel on Button Tap
 
 ```ts
-await StickyNotification.startService({
-  title: 'Quick Actions',
-  text: '10 shortcuts available',
-  smallIcon: 'ic_notification',
-  buttonsPerRow: 5,   // 5 per row → 2 rows for 10 actions
-  actions: [
-    { id: 'action1',  title: 'Action 1'  },
-    { id: 'action2',  title: 'Action 2'  },
-    { id: 'action3',  title: 'Action 3'  },
-    { id: 'action4',  title: 'Action 4'  },
-    { id: 'action5',  title: 'Action 5'  },
-    { id: 'action6',  title: 'Action 6'  },
-    { id: 'action7',  title: 'Action 7'  },
-    { id: 'action8',  title: 'Action 8'  },
-    { id: 'action9',  title: 'Action 9'  },
-    { id: 'action10', title: 'Action 10' },
-  ],
-});
-```
-
-### Limiting displayed buttons
-
-```ts
-// Provide 10 actions but only display the first 3
-await StickyNotification.startService({
-  title: 'Player',
-  text: 'Now playing',
-  maxButtons: 3,
-  buttonsPerRow: 3,
-  actions: [
-    { id: 'prev',  title: 'Prev'  },
-    { id: 'pause', title: 'Pause' },
-    { id: 'next',  title: 'Next'  },
-    // … additional actions defined but hidden by maxButtons
-  ],
-});
-```
-
-### Updating the notification in-place
-
-```ts
-// Change content without restarting the service (no visual flicker)
-await StickyNotification.updateNotification({
-  text: 'Now playing: Another Great Song',
-  actions: [
-    { id: 'prev', title: 'Prev', icon: 'ic_skip_previous' },
-    { id: 'play', title: 'Play', icon: 'ic_play_arrow' },
-    { id: 'next', title: 'Next', icon: 'ic_skip_next' },
-  ],
-});
-```
-
-### Passing data through action payloads
-
-```ts
-await StickyNotification.startService({
+StickyNotification.startService({
   title: 'Download Manager',
-  text: '3 items downloading…',
+  text: '3 files downloading…',
+  closeOnAction: true,     // collapse notification drawer on tap
+  openAppOnAction: true,   // bring app to foreground on tap
+  actions: [{ id: 'view', title: 'View Progress', icon: 'ic_download' }],
+});
+```
+
+> **Killed state**: When the app process is not running, tapping any action always opens the app regardless of `openAppOnAction`.
+
+### 4. Sticky Notification on Android 14+
+
+Android 14 allows users to swipe foreground service notifications away. Enable `repostOnDismiss` (default: `true`) to make the notification immediately reappear:
+
+```ts
+StickyNotification.startService({
+  title: 'Background Sync',
+  repostOnDismiss: true,   // default — notification reappears immediately after swipe
+  // repostOnDismiss: false  // allow user to hide it temporarily
+});
+```
+
+### 5. More Than 5 Buttons Across Multiple Rows
+
+```ts
+StickyNotification.startService({
+  title: 'Toolbar',
+  buttonsPerRow: 5,   // 5 per row → 2 rows for 10 actions
+  actions: Array.from({ length: 10 }, (_, i) => ({
+    id: `action${i + 1}`,
+    title: `A${i + 1}`,
+  })),
+});
+```
+
+### 6. Passing Data Through Action Payloads
+
+```ts
+StickyNotification.startService({
+  title: 'Download Manager',
   actions: [
     {
       id: 'cancel',
@@ -272,7 +258,21 @@ StickyNotification.addActionListener(({ actionId, payload }) => {
 });
 ```
 
-### Navigating to a screen from an action
+### 7. Live Update Without Flicker
+
+```ts
+// Update text and buttons in-place — no service restart, no visual flash
+await StickyNotification.updateNotification({
+  text: 'Now playing: Another Great Song',
+  actions: [
+    { id: 'prev',  title: 'Prev', icon: 'ic_skip_previous' },
+    { id: 'play',  title: 'Play', icon: 'ic_play_arrow'    },
+    { id: 'next',  title: 'Next', icon: 'ic_skip_next'     },
+  ],
+});
+```
+
+### 8. Navigate to a Screen from an Action
 
 ```tsx
 import { NavigationContainerRef } from '@react-navigation/native';
@@ -288,257 +288,270 @@ StickyNotification.addActionListener(({ actionId }) => {
 
 ---
 
-## API Reference
+## 📚 Methods
 
-### `StickyNotification.startService(options)`
-
-Starts the Android foreground service and shows the persistent notification. The notification channel is created automatically on first call.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `options` | `StickyNotificationOptions` | See [TypeScript Types](#typescript-types) |
-
-Returns `Promise<void>`.
-
----
-
-### `StickyNotification.stopService()`
-
-Stops the foreground service and removes the notification. Safe to call even when the service is not running.
-
-Returns `Promise<void>`.
+| Method | Returns | Description |
+|---|---|---|
+| `startService(options)` | `Promise<void>` | Start the foreground service and show the notification. Channel is created automatically. |
+| `stopService()` | `Promise<void>` | Stop the service and remove the notification. Safe to call when not running. |
+| `updateNotification(options)` | `Promise<void>` | Update notification content in-place. Supply only the keys you want to change. |
+| `isServiceRunning()` | `Promise<boolean>` | `true` when the service is active. Always `false` on iOS. |
+| `addActionListener(callback)` | `EmitterSubscription` | Subscribe to action-button tap events. Call `.remove()` on unmount. |
+| `removeAllListeners()` | `void` | Remove every active action listener at once. |
 
 ---
 
-### `StickyNotification.updateNotification(options)`
+## ⚙️ Props API Reference
 
-Updates the notification content without restarting the service. Supply only the keys you want to change. The `notificationId` must match the one used in `startService`.
+### 📋 Channel & Identity
 
-Returns `Promise<void>`.
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `channelId` | `string` | `"sticky_notification_channel"` | Android notification channel ID. Use a stable value; changing it creates a new channel. |
+| `channelName` | `string` | `"Sticky Notification"` | Human-readable channel name shown in Android system settings. |
+| `channelDescription` | `string` | — | Optional channel description shown in system settings. |
+| `notificationId` | `number` | `1337` | Android notification ID. Use a fixed value to update in-place; change it to show an independent notification. |
+
+### 📝 Content
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `title` | `string` | **Required** | Bold title line. |
+| `text` | `string` | — | Body text. Hidden automatically when absent or empty — no blank gap. |
+| `subText` | `string` | — | Smaller sub-text below the body. Hidden when absent or empty. |
+
+### 🖼️ Icons & Accent Colour
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `smallIcon` | `string` | App launcher icon | Drawable resource name for the status-bar icon. Must be a white-on-transparent PNG/vector. |
+| `largeIcon` | `string` | — | Drawable resource name decoded as a large bitmap on the right side. |
+| `color` | `string` | — | Hex accent colour for the notification, e.g. `"#FF5722"`. |
+
+### 🛠️ Behaviour
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `priority` | `'min' \| 'low' \| 'default' \| 'high' \| 'max'` | `"default"` | Notification importance / priority. |
+| `ongoing` | `boolean` | `true` | Prevent the user from swiping the notification away (pre-Android 14). |
+| `autoCancel` | `boolean` | `false` | Dismiss notification when the user taps its body. |
+| `repostOnDismiss` | `boolean` | `true` | On Android 14+, where foreground service notifications can be swiped, immediately re-post the notification after dismissal to keep it truly sticky. Set to `false` to allow temporary hiding. |
+| `openAppOnAction` | `boolean` | `false` | Bring the app to the foreground whenever any action button is tapped. When the app process is killed, the app always opens regardless of this prop. |
+| `closeOnAction` | `boolean` | `false` | Collapse the notification panel when any action button is tapped. Implemented via a transparent trampoline Activity — the only reliable cross-version mechanism on Android 10+. |
+
+### 🔲 Button Layout
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `actions` | `NotificationAction[]` | — | Interactive buttons displayed in the notification panel. No hard limit. |
+| `buttonsPerRow` | `number` | `5` | Action buttons per row. Reduce for wider buttons with longer labels. Minimum: 1. |
+| `maxButtons` | `number` | `0` (no cap) | Maximum total buttons to display. Buttons beyond this count are silently hidden. |
+
+### 🎨 Divider Styling
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `showDivider` | `boolean` | `true` | Show or hide the horizontal line between the text area and action buttons. Set to `false` when `text` is empty to avoid a floating orphan line. |
+| `dividerColor` | `string` | `"#33000000"` | Hex colour for the divider. Has no effect when `showDivider` is `false`. |
+
+### 🖌️ Text Colours
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `titleColor` | `string` | System default | Hex colour for the title text, e.g. `"#FFFFFF"`. |
+| `textColor` | `string` | System default | Hex colour for the body text. |
+| `subTextColor` | `string` | System default | Hex colour for the sub-text. |
+
+### 🎭 Action Button Styling (Global)
+
+These apply to **all** action buttons. Individual buttons can override them — see [Per-Button Styling](#per-button-styling) below.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `actionLabelColor` | `string` | System default | Hex colour applied to every button's text label. |
+| `actionIconTint` | `string` | None | Hex tint applied to every button's icon via a `SRC_ATOP` colour filter. No effect on icon-less buttons. |
+| `actionBackground` | `string` | None | Hex background colour for each individual button. |
+| `actionBorderRadius` | `number` | `0` | Corner radius in dp for button backgrounds. Set to a large value (e.g. `100`) for a pill/capsule shape. Requires `actionBackground` to be visible. |
+| `actionsContainerBackground` | `string` | None | Hex background colour for the entire button strip container. |
 
 ---
 
-### `StickyNotification.isServiceRunning()`
+## 🧩 Data Models
 
-Returns `Promise<boolean>` — `true` when the service is currently active. Always resolves to `false` on iOS.
+### `NotificationAction`
 
----
-
-### `StickyNotification.addActionListener(callback)`
-
-Subscribes to action-button press events.
-
-```ts
-const sub = StickyNotification.addActionListener((event: ActionPressEvent) => {
-  console.log(event.actionId, event.payload);
-});
-
-// Remove when done:
-sub.remove();
-```
-
-Returns an `EmitterSubscription`. Always call `.remove()` on component unmount.
-
----
-
-### `StickyNotification.removeAllListeners()`
-
-Removes every active action listener at once.
-
----
-
-## TypeScript Types
-
-```ts
+```typescript
 interface NotificationAction {
   /** Unique identifier returned in ActionPressEvent when this button is tapped. */
   id: string;
   /** Label shown on the button. */
   title: string;
-  /** Name of a drawable resource in the host app (without file extension). */
+  /** Drawable resource name in the host app's res/drawable folder (no extension). */
   icon?: string;
-  /** Arbitrary string forwarded with the action press event. */
+  /** Arbitrary string forwarded as-is with the action press event. */
   payload?: string;
-}
 
+  // Per-button styling (overrides global action* props for this button only)
+  /** Hex colour for this button's label text. */
+  labelColor?: string;
+  /** Hex tint applied to this button's icon (SRC_ATOP). */
+  iconTint?: string;
+  /** Hex background colour for this button's container. */
+  background?: string;
+  /** Corner radius in dp for this button's background. Overrides global actionBorderRadius. */
+  borderRadius?: number;
+}
+```
+
+### `StickyNotificationOptions`
+
+```typescript
 interface StickyNotificationOptions {
   // Channel
-  channelId?: string;          // Default: "sticky_notification_channel"
+  channelId?: string;
   channelName?: string;
   channelDescription?: string;
 
   // Identity
-  notificationId?: number;     // Default: 1337
+  notificationId?: number;
 
   // Content
-  title: string;               // Required
+  title: string;                 // Required
   text?: string;
   subText?: string;
 
-  // Icons & colour
-  smallIcon?: string;          // Drawable resource name (white-on-transparent PNG)
-  largeIcon?: string;          // Drawable resource name decoded as Bitmap
-  color?: string;              // Hex accent colour, e.g. "#FF5722"
+  // Icons & accent colour
+  smallIcon?: string;
+  largeIcon?: string;
+  color?: string;
 
   // Behaviour
   priority?: 'min' | 'low' | 'default' | 'high' | 'max';
-  ongoing?: boolean;           // Default: true (cannot be swiped away)
-  autoCancel?: boolean;        // Default: false
+  ongoing?: boolean;
+  autoCancel?: boolean;
+  repostOnDismiss?: boolean;
+  openAppOnAction?: boolean;
+  closeOnAction?: boolean;
 
-  // Actions
+  // Button layout
   actions?: NotificationAction[];
-
-  /**
-   * Number of action buttons per row.
-   * Default: 5.  Reduce for wide buttons with long labels.  Minimum: 1.
-   */
   buttonsPerRow?: number;
-
-  /**
-   * Maximum total buttons to show.
-   * Buttons beyond this count are silently hidden.
-   * Omit or set to 0 for no limit.
-   */
   maxButtons?: number;
-}
 
+  // Divider
+  showDivider?: boolean;
+  dividerColor?: string;
+
+  // Text colours
+  titleColor?: string;
+  textColor?: string;
+  subTextColor?: string;
+
+  // Action button styling (global)
+  actionLabelColor?: string;
+  actionIconTint?: string;
+  actionBackground?: string;
+  actionBorderRadius?: number;
+  actionsContainerBackground?: string;
+}
+```
+
+### `ActionPressEvent`
+
+```typescript
 interface ActionPressEvent {
   /** The `id` of the tapped NotificationAction. */
   actionId: string;
-  /** The `payload` from the NotificationAction, if provided. */
+  /** The `payload` string from the NotificationAction, if provided. */
   payload?: string;
 }
 ```
 
 ---
 
-## Button Layout
+## 🔲 Per-Button Styling
 
-### How buttons are arranged
+Every styling prop that can be set globally also has a per-button override inside `NotificationAction`. Per-button values take priority; missing values fall back to the global prop; if the global prop is also absent, the system default is used.
 
-The library uses a custom `RemoteViews` panel injected as the notification's **expanded (big) content view**. This bypasses Android's standard 3-action cap entirely.
+```
+Per-button prop  →  Global action* prop  →  System default
+```
 
-- Actions are split into rows of `buttonsPerRow` (default 5).
-- Each row is a `LinearLayout` with equal-weight children, so buttons share the available width evenly.
-- If a button has an `icon`, the icon is shown above the `title` text.
-- If no `icon` is given, only the text is shown.
+```ts
+StickyNotification.startService({
+  // Global defaults
+  actionBorderRadius: 8,
+  actionBackground: '#2A2A2A',
+  actionLabelColor: '#AAAAAA',
+
+  actions: [
+    { id: 'prev', title: '⏮' },                   // uses all globals
+    {
+      id: 'play',
+      title: '▶ Play',
+      background: '#1DB954',                        // overrides global background
+      labelColor: '#000000',                        // overrides global label colour
+      borderRadius: 100,                            // overrides global border radius (pill)
+    },
+    { id: 'next', title: '⏭' },                   // uses all globals
+  ],
+});
+```
+
+---
+
+## 📡 Event Delivery Across App States
+
+| App state | Delivery mechanism |
+|---|---|
+| **Foreground** | Receiver → module static reference → `DeviceEventEmitter` |
+| **Background** (process alive) | Same path; event is queued until JS layer resumes |
+| **Killed / cold start** | Receiver writes event to `SharedPreferences`; app is launched; module reads and emits in `onHostResume()` |
+
+**Retry logic** — on New Architecture, `onHostResume` fires before the JS bundle finishes loading. The module defers the first emit by 150 ms and retries up to 8 times with a 250 ms back-off until the bridge accepts the call.
+
+**Force-stop** — when the user force-stops the app from Android Settings, both the service and the notification are removed immediately. No delivery is expected after a force-stop.
+
+---
+
+## 📐 Button Layout Diagram
 
 ```
 buttonsPerRow: 5, 7 actions → 2 rows
-┌───────────────────────────────────────┐
-│ Title                                 │  ← standard collapsed view
-│ Body text                             │
-└───────────────────────────────────────┘
-        ↓ user expands ↓
-┌───────────────────────────────────────┐
-│ App icon  ·  App name  ·  timestamp   │  ← system decoration
-├───────────────────────────────────────┤
-│ Title                                 │
-│ Body text                             │
-├ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤
-│ [Btn1] [Btn2] [Btn3] [Btn4] [Btn5]   │  ← row 1
-│       [Btn6] [Btn7]                   │  ← row 2
-└───────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│ Title                                   │  ← collapsed view
+│ Body text                               │
+└─────────────────────────────────────────┘
+           ↓ user expands ↓
+┌─────────────────────────────────────────┐
+│ App icon · App name · timestamp         │  ← system header
+├─────────────────────────────────────────┤
+│ Title                                   │
+│ Body text                               │
+├ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤  ← showDivider
+│ [Btn1] [Btn2] [Btn3] [Btn4] [Btn5]     │  ← row 1
+│       [Btn6] [Btn7]                     │  ← row 2
+└─────────────────────────────────────────┘
 ```
 
 ### Choosing `buttonsPerRow`
 
 | Use case | Recommended value |
-|----------|-----------------|
-| Icon-only or very short labels (≤ 4 chars) | 5 |
-| Short labels (≤ 8 chars) | 4 |
-| Medium labels (≤ 12 chars) | 3 |
-| Long labels | 2 |
-
-### Using `maxButtons`
-
-`maxButtons` is useful when you have a variable-length actions array but want a guaranteed upper bound on the notification UI:
-
-```ts
-// Always show at most 6 buttons, 3 per row
-{
-  buttonsPerRow: 3,
-  maxButtons: 6,
-  actions: dynamicActions,   // could have any length
-}
-```
+|---|---|
+| Icon-only or very short labels (≤ 4 chars) | `5` |
+| Short labels (≤ 8 chars) | `4` |
+| Medium labels (≤ 12 chars) | `3` |
+| Long labels | `2` |
 
 ---
 
-## Event Delivery Across App States
+## 🍎 iOS Limitations
 
-| App state | Delivery mechanism |
-|-----------|-------------------|
-| **Foreground** | `BroadcastReceiver` → module static reference → `NativeEventEmitter` |
-| **Background** (process alive) | Same as foreground; event is queued until the JS layer resumes |
-| **Killed / restarted** | `BroadcastReceiver` writes event to `SharedPreferences`; the app is launched; the module reads and emits the event in `onHostResume()` |
+iOS has no equivalent of Android's foreground service:
 
-**Important:** when the app process is killed, the foreground service is also killed and the notification is removed by Android. The killed-state delivery path covers:
-
-- System-initiated process termination (low memory) followed by `START_STICKY` restart.
-- The user tapping a button just as the process is dying — event persists in SharedPreferences and is delivered when the app reopens.
-- It does **not** cover a user force-stop from Settings (notification disappears; no delivery expected).
-
----
-
-## Customisation
-
-### Notification icons
-
-All icon fields accept the **resource name** (string) of a drawable placed in `android/app/src/main/res/drawable/`.
-
-```
-res/drawable/
-  ic_notification.png    ← smallIcon: 'ic_notification'
-  ic_pause.png           ← action icon (per-button): 'ic_pause'
-  app_logo.png           ← largeIcon: 'app_logo'
-```
-
-Vector drawables (XML) are supported for `smallIcon` and per-button icons.
-
-### Accent colour
-
-```ts
-color: '#FF5722'   // deep orange
-color: '#1DB954'   // Spotify green
-```
-
-The `color` field sets the notification's accent colour (small icon tint, expand-line colour on some devices).
-
-### Notification priority / importance
-
-| Value | Behaviour |
-|-------|-----------|
-| `"min"` | No sound, hidden from status bar on some devices |
-| `"low"` | No sound, appears in status bar |
-| `"default"` | System default sound / vibration |
-| `"high"` | Makes a sound |
-| `"max"` | Full heads-up notification |
-
-The channel importance is set once at **first channel creation**. To change importance, use a new `channelId`.
-
-### Custom notification appearance
-
-The expanded panel (`RemoteViews`) provides:
-- `title` (bold) + `text` + optional `subText` in the header
-- Rows of icon + label buttons below a divider
-
-Android does not allow arbitrary CSS styling inside `RemoteViews`. The panel uses system default text colours, which automatically adapt to the notification background on Android 12+.
-
----
-
-## iOS Limitations
-
-iOS does not provide an equivalent to Android's foreground service:
-
-1. **No persistent background execution** — iOS aggressively suspends background apps.
-2. **No non-dismissible notifications** — iOS has no `ongoing` notification mode.
-3. **No direct service-to-JS routing** — iOS notification actions go through the App Delegate.
-
-**Closest iOS alternatives:**
-
-| Use case | iOS approach |
-|----------|-------------|
+| Use case | iOS alternative |
+|---|---|
 | Media playback controls | `AVAudioSession` + `MPRemoteCommandCenter` (Now Playing) |
 | Ongoing call UI | `CallKit` (`CXCallController`) |
 | Rich notifications with actions | `UNUserNotificationCenter` with `UNNotificationAction` |
@@ -547,46 +560,31 @@ iOS does not provide an equivalent to Android's foreground service:
 The library's JS API returns safe no-ops on iOS:
 
 ```ts
-await StickyNotification.startService({ title: 'My Service' }); // no-op on iOS
-const running = await StickyNotification.isServiceRunning();     // false on iOS
+await StickyNotification.startService({ title: 'My Service' }); // no-op
+const running = await StickyNotification.isServiceRunning();     // always false
 ```
 
 ---
 
-## Known Limitations
+## ⚠️ Known Limitations
 
-### Expanded view required to see buttons
+**Expanded view required for buttons** — Action buttons live in the notification's big-content view. Users must expand the notification (long-press or swipe down) to see them.
 
-The action buttons are rendered in the notification's **expanded (big) content view** via `RemoteViews`. The user must expand the notification (long-press or swipe down) to see the buttons. The collapsed view shows only `title` and `text`.
+**Channel settings are user-controlled after creation** — Importance, sound, and vibration are locked to the user's preference once a channel is created. Use a new `channelId` to change importance programmatically.
 
-This is intentional: fitting many buttons in the single-row collapsed height is impractical. If you need action buttons visible in the collapsed state, consider limiting to 1–2 buttons and using a `setCustomContentView` approach (currently out of scope).
+**Android 14+ swipe behaviour** — The system allows users to dismiss foreground service notifications. `repostOnDismiss: true` (default) re-posts immediately via `deleteIntent`. Set it to `false` to allow temporary dismissal.
 
-### `RemoteViews.addView()` is API 16+
+**Force-stop clears everything** — A user force-stop from Android Settings removes the service, notification, and any pending SharedPreferences events immediately.
 
-Dynamic button injection uses `RemoteViews.addView()`. This library's `minSdkVersion` is 24 (Android 7.0), so this is always available.
-
-### Android 14+ foreground service restrictions
-
-Android 14 (API 34) requires foreground services to declare an explicit service type. This library uses `dataSync`. Review Google's [foreground service documentation](https://developer.android.com/guide/components/foreground-services) if a different type better fits your use case.
-
-### Notification channel settings are immutable after creation
-
-Once a channel is created with a `channelId`, its importance, sound, and vibration settings are user-controlled. To change importance programmatically, use a new `channelId`.
-
-### Force-stop clears the notification
-
-When the user force-stops the app from Android Settings, both the service and the notification are immediately removed. The service will not restart automatically after a force-stop.
-
-### `START_STICKY` restart window
-
-If Android kills the process due to memory pressure, the service is restarted via `START_STICKY`. During the brief window between the kill and the restart the notification disappears and then reappears. This is standard Android foreground service behaviour.
+**`START_STICKY` restart gap** — If Android kills the process under memory pressure, the service restarts via `START_STICKY`. The notification briefly disappears and reappears during the restart window. This is standard Android foreground service behaviour.
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-- [Development workflow](CONTRIBUTING.md#development-workflow)
-- [Sending a pull request](CONTRIBUTING.md#sending-a-pull-request)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and pull-request guidelines.
+
+---
 
 ## License
 
@@ -594,4 +592,18 @@ MIT © [Senthalan](https://github.com/senthalan2)
 
 ---
 
-Made with [create-react-native-library](https://github.com/callstack/react-native-builder-bob)
+## Support
+
+If you find this project helpful, please consider supporting it:
+
+⭐ **Give it a star on GitHub** — Your stars help keep this project alive and improving!
+
+[![GitHub stars](https://img.shields.io/github/stars/senthalan2/react-native-sticky-notification?style=social)](https://github.com/senthalan2/react-native-sticky-notification/stargazers)
+
+☕ **Buy me a coffee** — Your support keeps me motivated to maintain and enhance this package!
+
+<a href="https://www.buymeacoffee.com/senthalan2" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-red.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" >
+</a>
+
+Thank you for your support! 🙏

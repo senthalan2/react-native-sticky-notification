@@ -58,6 +58,7 @@
       <FrameLayout> is allowed and works identically as a colour-fill divider.
     -->
     <FrameLayout
+        android:id="@+id/notification_divider"
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#33000000"
