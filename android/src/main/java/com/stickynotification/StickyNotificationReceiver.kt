@@ -41,15 +41,15 @@ class StickyNotificationReceiver : BroadcastReceiver() {
         }
         .apply()
 
-      // Launch the app to let the user see the result
+      // Launch the app to let the user see the result.
+      // FLAG_ACTIVITY_CLEAR_TOP is intentionally omitted: it forces MainActivity
+      // to recreate, which triggers onWindowFocusChanged before ReactHostImpl is
+      // ready in the New Architecture and produces a ReactNoCrashSoftException.
+      // The event data is already in SharedPreferences — no extras needed here.
       context.packageManager
         .getLaunchIntentForPackage(context.packageName)
         ?.apply {
-          flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-            Intent.FLAG_ACTIVITY_CLEAR_TOP
-          putExtra(EXTRA_ACTION_ID, actionId)
-          payload?.let { putExtra(EXTRA_PAYLOAD, it) }
+          flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         ?.let { context.startActivity(it) }
     }

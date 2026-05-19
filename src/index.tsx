@@ -1,4 +1,4 @@
-import { NativeEventEmitter, Platform } from 'react-native';
+import { DeviceEventEmitter, Platform } from 'react-native';
 import type { EmitterSubscription } from 'react-native';
 import NativeStickyNotification from './NativeStickyNotification';
 
@@ -126,10 +126,12 @@ export interface ActionPressEvent {
 
 const ACTION_PRESS_EVENT = 'StickyNotification_onActionPress';
 
-const nativeEmitter =
-  Platform.OS === 'android'
-    ? new NativeEventEmitter(NativeStickyNotification)
-    : null;
+// DeviceEventEmitter is used instead of NativeEventEmitter(module) for two reasons:
+//  1. NativeEventEmitter forces the TurboModule to load at import time, which can
+//     race with the New Architecture bridge initialisation and cause a
+//     ReactNoCrashSoftException on cold launch.
+//  2. DeviceEventEmitter is lazily subscribed — it has no module dependency and
+//     works identically with the RCTDeviceEventEmitter emissions from the Kotlin side.
 
 // ─── Public API ────────────────────────────────────────────────────────────
 
@@ -206,18 +208,20 @@ export const StickyNotification = {
   addActionListener(
     callback: (event: ActionPressEvent) => void
   ): EmitterSubscription {
-    if (!nativeEmitter) {
+    if (Platform.OS !== 'android') {
       // Return a no-op subscription on unsupported platforms
       return { remove: () => {} } as EmitterSubscription;
     }
-    return nativeEmitter.addListener(ACTION_PRESS_EVENT, (event) =>
+    return DeviceEventEmitter.addListener(ACTION_PRESS_EVENT, (event) =>
       callback(event as ActionPressEvent)
     );
   },
 
   /** Remove all active action listeners at once. */
   removeAllListeners(): void {
-    nativeEmitter?.removeAllListeners(ACTION_PRESS_EVENT);
+    if (Platform.OS === 'android') {
+      DeviceEventEmitter.removeAllListeners(ACTION_PRESS_EVENT);
+    }
   },
 };
 

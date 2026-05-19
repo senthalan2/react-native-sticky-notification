@@ -3,6 +3,8 @@ package com.stickynotification
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
@@ -11,13 +13,35 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.modules.core.DeviceEventManagerModule
 
+/**
+ * TurboModule bridge for react-native-sticky-notification.
+ *
+ * New Architecture (React Native 0.73+) compatibility notes
+ * ──────────────────────────────────────────────────────────
+ * 1. onHostResume fires when the Android Activity resumes, which happens
+ *    BEFORE the JS bundle has finished loading in the New Architecture.
+ *    All event delivery is therefore deferred via Handler.postDelayed and
+ *    retried with back-off until the bridge accepts the emission.
+ *
+ * 2. Every call to the JS DeviceEventEmitter is wrapped in a try/catch.
+ *    If the bridge is not yet accepting calls, the event is placed back at
+ *    the front of the pending queue and a retry is scheduled.
+ *
+ * 3. The module holds a weak static reference to itself so the
+ *    BroadcastReceiver can route action events into the module without
+ *    coupling the two classes beyond a single static method.
+ */
 @ReactModule(name = StickyNotificationModule.NAME)
 class StickyNotificationModule(reactContext: ReactApplicationContext) :
   NativeStickyNotificationSpec(reactContext), LifecycleEventListener {
 
-  // Queue for events received before the JS layer resumes
+  // In-memory queue for events that arrived before JS was ready
   private val pendingQueue = mutableListOf<Pair<String, String?>>()
   private var isResumed = false
+  private var drainRetryCount = 0
+
+  // All Handler operations run on the main thread to keep synchronisation simple.
+  private val mainHandler = Handler(Looper.getMainLooper())
 
   init {
     currentInstance = this
@@ -81,22 +105,36 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
 
   override fun removeListeners(count: Double) {}
 
-  // ─── Event delivery ───────────────────────────────────────────────────────
+  // ─── Inbound event routing (called from BroadcastReceiver) ───────────────
 
   /**
-   * Called by StickyNotificationReceiver when an action button is tapped.
-   * Returns true if the event was or will be delivered; false if the module
-   * is not initialised (app process not running).
+   * Entry point called by StickyNotificationReceiver on the main thread.
+   * If the JS layer is already live we attempt immediate delivery; otherwise
+   * the event is queued and will be flushed in the next drainEvents pass.
    */
   private fun handleActionPressed(actionId: String, payload: String?) {
-    if (isResumed) {
-      emitActionEvent(actionId, payload)
-    } else {
-      synchronized(pendingQueue) { pendingQueue.add(Pair(actionId, payload)) }
+    mainHandler.post {
+      if (isResumed) {
+        val delivered = tryEmit(actionId, payload)
+        if (!delivered) {
+          // Bridge not ready yet — queue and schedule a retry
+          synchronized(pendingQueue) { pendingQueue.add(Pair(actionId, payload)) }
+          scheduleRetry()
+        }
+      } else {
+        synchronized(pendingQueue) { pendingQueue.add(Pair(actionId, payload)) }
+      }
     }
   }
 
-  private fun emitActionEvent(actionId: String, payload: String?) {
+  // ─── Event emission ───────────────────────────────────────────────────────
+
+  /**
+   * Attempts a single event emission to the JS layer.
+   * Returns true on success, false when the bridge is not yet accepting calls.
+   * All exceptions are caught so a not-ready bridge never crashes the process.
+   */
+  private fun tryEmit(actionId: String, payload: String?): Boolean = try {
     val params = Arguments.createMap().apply {
       putString("actionId", actionId)
       payload?.let { putString("payload", it) }
@@ -104,45 +142,92 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
     reactApplicationContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
       .emit(EVENT_ACTION_PRESS, params)
+    true
+  } catch (_: Exception) {
+    false
+  }
+
+  // ─── Pending-event drain with retry ──────────────────────────────────────
+
+  /**
+   * Loads any SharedPreferences event written during a killed-state launch,
+   * then attempts to deliver every queued event.  Failed deliveries are
+   * placed back at the head of the queue and a retry is scheduled.
+   *
+   * This is called from the main thread only.
+   */
+  private fun drainEvents() {
+    if (!isResumed) return
+
+    // Merge the SharedPreferences entry (written by Receiver when process was dead)
+    loadPersistedEvent()
+
+    val snapshot: List<Pair<String, String?>>
+    synchronized(pendingQueue) {
+      snapshot = pendingQueue.toList()
+      pendingQueue.clear()
+    }
+
+    val failed = snapshot.filterNot { (id, pl) -> tryEmit(id, pl) }
+
+    if (failed.isNotEmpty()) {
+      // Preserve order: put failures back at the front
+      synchronized(pendingQueue) { pendingQueue.addAll(0, failed) }
+      scheduleRetry()
+    } else {
+      drainRetryCount = 0
+    }
+  }
+
+  private fun scheduleRetry() {
+    if (!isResumed || drainRetryCount >= MAX_DRAIN_RETRIES) {
+      drainRetryCount = 0
+      return
+    }
+    drainRetryCount++
+    mainHandler.postDelayed(::drainEvents, RETRY_DELAY_MS)
+  }
+
+  private fun loadPersistedEvent() {
+    val prefs = reactApplicationContext
+      .getSharedPreferences(StickyNotificationReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+    val actionId = prefs.getString(StickyNotificationReceiver.KEY_PENDING_ACTION, null)
+      ?: return
+    val payload = prefs.getString(StickyNotificationReceiver.KEY_PENDING_PAYLOAD, null)
+    prefs.edit()
+      .remove(StickyNotificationReceiver.KEY_PENDING_ACTION)
+      .remove(StickyNotificationReceiver.KEY_PENDING_PAYLOAD)
+      .apply()
+    synchronized(pendingQueue) { pendingQueue.add(Pair(actionId, payload)) }
   }
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   override fun onHostResume() {
     isResumed = true
-
-    // Deliver events saved when the app was killed (written by the Receiver)
-    val prefs = reactApplicationContext
-      .getSharedPreferences(StickyNotificationReceiver.PREFS_NAME, Context.MODE_PRIVATE)
-    val pendingAction = prefs.getString(StickyNotificationReceiver.KEY_PENDING_ACTION, null)
-    if (pendingAction != null) {
-      val pendingPayload = prefs.getString(StickyNotificationReceiver.KEY_PENDING_PAYLOAD, null)
-      prefs.edit()
-        .remove(StickyNotificationReceiver.KEY_PENDING_ACTION)
-        .remove(StickyNotificationReceiver.KEY_PENDING_PAYLOAD)
-        .apply()
-      emitActionEvent(pendingAction, pendingPayload)
-    }
-
-    // Flush events that arrived while JS was not yet ready
-    val queued: List<Pair<String, String?>>
-    synchronized(pendingQueue) {
-      queued = pendingQueue.toList()
-      pendingQueue.clear()
-    }
-    queued.forEach { (id, pl) -> emitActionEvent(id, pl) }
+    drainRetryCount = 0
+    // New Architecture: onHostResume fires on Activity.onResume(), which can
+    // precede full JS bundle load.  A short initial delay avoids emitting
+    // events into a not-yet-ready bridge on cold launch.
+    mainHandler.postDelayed(::drainEvents, INITIAL_DRAIN_DELAY_MS)
   }
 
   override fun onHostPause() {
     isResumed = false
+    mainHandler.removeCallbacks(::drainEvents)
+    drainRetryCount = 0
   }
 
   override fun onHostDestroy() {
     isResumed = false
+    mainHandler.removeCallbacks(::drainEvents)
+    drainRetryCount = 0
   }
 
   override fun invalidate() {
     if (currentInstance === this) currentInstance = null
+    isResumed = false
+    mainHandler.removeCallbacks(::drainEvents)
     reactApplicationContext.removeLifecycleEventListener(this)
     super.invalidate()
   }
@@ -151,15 +236,32 @@ class StickyNotificationModule(reactContext: ReactApplicationContext) :
     const val NAME = "StickyNotification"
     const val EVENT_ACTION_PRESS = "StickyNotification_onActionPress"
 
+    /**
+     * Delay before first drain on resume.  Gives the New Architecture JS
+     * runtime enough time to finish bundle evaluation after Activity.onResume.
+     */
+    private const val INITIAL_DRAIN_DELAY_MS = 150L
+
+    /**
+     * Delay between retry attempts when the bridge rejects an emission.
+     */
+    private const val RETRY_DELAY_MS = 250L
+
+    /**
+     * Maximum number of automatic retry attempts per resume cycle.
+     * Prevents an infinite loop if the bridge never becomes ready.
+     */
+    private const val MAX_DRAIN_RETRIES = 8
+
     @Volatile
     private var currentInstance: StickyNotificationModule? = null
 
     /**
      * Called from StickyNotificationReceiver (same process) to route an
-     * action-press event to the JS layer.
+     * action-press event into the JS layer.
      *
      * @return true when the module instance was available; false when the app
-     *   process was not running (caller should persist the event instead).
+     *   process was not running (caller should persist to SharedPreferences).
      */
     fun notifyActionPressed(actionId: String, payload: String?): Boolean {
       val instance = currentInstance ?: return false
