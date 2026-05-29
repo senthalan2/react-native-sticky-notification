@@ -98,6 +98,22 @@ export interface StickyNotificationOptions {
   color?: string;
 
   // ── Behaviour ────────────────────────────────────────────────────────────
+  /**
+   * Controls when the foreground service notification appears on screen
+   * (Android 12 / API 31+ only; ignored on older versions).
+   *
+   * - `'immediate'` — the notification is posted as soon as the service
+   *   calls `startForeground()`. Use this when the user must see the
+   *   notification right away (e.g. media playback, active calls).
+   * - `'default'` — the system may delay showing the notification by up
+   *   to 10 seconds if the service completes quickly. This avoids a brief
+   *   flash for short-lived operations. *(Default)*
+   * - `'deferred'` — the system delays the notification as long as
+   *   possible. Suitable for background operations the user did not
+   *   directly initiate (e.g. silent sync on boot).
+   */
+  foregroundServiceBehavior?: 'immediate' | 'default' | 'deferred';
+
   /** Notification importance / priority. Default: "default". */
   priority?: 'min' | 'low' | 'default' | 'high' | 'max';
   /**

@@ -44,20 +44,71 @@ React Native's [auto-linking](https://github.com/react-native-community/cli/blob
 
 ### 1. Permissions
 
-Add the following to your app's `android/app/src/main/AndroidManifest.xml` inside the `<manifest>` block, **above** `<application>`:
+The library does **not** declare any permissions. Add the ones you need to your app's `android/app/src/main/AndroidManifest.xml` inside the `<manifest>` block, **above** `<application>`:
 
 ```xml
-<!-- Always required -->
+<!-- Always required — allows the service to run in the foreground -->
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-<!-- Required on Android 14+ (API 34) for the dataSync service type -->
+<!-- Add the permission that matches your foregroundServiceType (see step 2) -->
+<!-- Example for dataSync: -->
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
 <!-- Required on Android 13+ (API 33) to show any notification -->
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 ```
 
-### 2. Runtime Notification Permission (Android 13+)
+Common `FOREGROUND_SERVICE_*` permissions by use case:
+
+| Use case | Permission |
+|---|---|
+| Data / network sync (default) | `FOREGROUND_SERVICE_DATA_SYNC` |
+| Media playback | `FOREGROUND_SERVICE_MEDIA_PLAYBACK` |
+| Location / navigation | `FOREGROUND_SERVICE_LOCATION` |
+| Phone / VoIP call | `FOREGROUND_SERVICE_PHONE_CALL` |
+| Bluetooth / USB device | `FOREGROUND_SERVICE_CONNECTED_DEVICE` |
+| Camera | `FOREGROUND_SERVICE_CAMERA` |
+| Microphone (API 30+) | `FOREGROUND_SERVICE_MICROPHONE` |
+| Health / fitness (API 34+) | `FOREGROUND_SERVICE_HEALTH` |
+
+### 2. Foreground Service Type (required on Android 14+ / API 34+)
+
+The library does **not** hardcode a `foregroundServiceType`. You must declare the correct type for your app in `android/app/src/main/AndroidManifest.xml`, overriding the library's service entry:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+  <application>
+    <!-- Replace the library's service entry with your own foregroundServiceType -->
+    <service
+      android:name="com.stickynotification.StickyNotificationService"
+      android:foregroundServiceType="dataSync"
+      tools:replace="android:foregroundServiceType" />
+  </application>
+
+</manifest>
+```
+
+Replace `"dataSync"` with the type that matches your app's purpose:
+
+| App category | Correct type |
+|---|---|
+| Fintech / Banking (quick-actions panel) | `dataSync` |
+| Music / Podcast player | `mediaPlayback` |
+| Navigation / Delivery tracking | `location` |
+| VoIP / Active call | `phoneCall` |
+| File upload / download | `dataSync` |
+| Fitness / Workout tracking | `health` |
+| Bluetooth device | `connectedDevice` |
+
+> **Android 14+ requirement** — Apps targeting API 34 must declare at least one `foregroundServiceType` and the matching `FOREGROUND_SERVICE_*` permission. Omitting either will cause `startForeground()` to throw.
+
+> **Android 10–13** — The type is optional but strongly recommended for Google Play compliance.
+
+The library reads the declared type from the merged manifest at runtime and passes it to `startForeground()` automatically — no JS prop needed.
+
+### 3. Runtime Notification Permission (Android 13+)
 
 On Android 13+ the user must grant `POST_NOTIFICATIONS` at runtime before any notification can appear:
 
@@ -75,11 +126,11 @@ async function requestNotificationPermission(): Promise<boolean> {
 
 Call this before `StickyNotification.startService(...)`.
 
-### 3. No Extra Manifest Entries
+### 4. No Extra Manifest Entries
 
-The library's own `AndroidManifest.xml` already declares the `<service>`, `<receiver>`, and trampoline `<activity>` entries through manifest merging. You do **not** need to copy them into your app manifest.
+The library's own `AndroidManifest.xml` already declares the `<service>`, `<receiver>`, and trampoline `<activity>` entries through manifest merging. You only need to add step 2 above when you want to set a `foregroundServiceType`.
 
-### 4. Notification Icons
+### 5. Notification Icons
 
 Android requires the small status-bar icon to be a **white-on-transparent** vector or PNG drawable. Add it to `android/app/src/main/res/drawable/` and pass the resource name (without the extension):
 
@@ -579,6 +630,7 @@ export default function App() {
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
+| `foregroundServiceBehavior` | `'immediate' \| 'default' \| 'deferred'` | `"default"` | Controls when the foreground service notification appears on screen (Android 12 / API 31+ only; ignored on older versions). `'immediate'` — post the notification without delay (use for media players, active calls). `'default'` — the system may delay up to 10 s for short-lived services. `'deferred'` — delay as long as possible (background sync, boot tasks). |
 | `priority` | `'min' \| 'low' \| 'default' \| 'high' \| 'max'` | `"default"` | Notification importance / priority. |
 | `ongoing` | `boolean` | `true` | Prevent the user from swiping the notification away (pre-Android 14). |
 | `autoCancel` | `boolean` | `false` | Dismiss notification when the user taps its body. |
@@ -741,6 +793,7 @@ interface StickyNotificationOptions {
   color?: string;
 
   // Behaviour
+  foregroundServiceBehavior?: 'immediate' | 'default' | 'deferred';
   priority?: 'min' | 'low' | 'default' | 'high' | 'max';
   ongoing?: boolean;
   autoCancel?: boolean;
@@ -957,52 +1010,38 @@ This section covers every aspect of the library that intersects with Google Play
 
 #### 1. Foreground Service Type — choose the type that matches your app
 
-The library declares `foregroundServiceType="dataSync"` in its manifest. **Google Play requires the declared type to accurately describe what your service actually does.** Using the wrong type can cause rejection or removal.
+**Google Play requires the declared `foregroundServiceType` to accurately describe what your service actually does.** Using the wrong type can cause rejection or removal.
+
+The library does **not** set a default type — you own this decision entirely. Declare the correct type in your app's `AndroidManifest.xml` as shown in [Android Setup → Step 2](#2-foreground-service-type-required-on-android-14--api-34) above.
 
 | App category | Use case | Correct `foregroundServiceType` |
 |---|---|---|
-| 💳 **Fintech / Banking** | Quick pay, transfer, balance check, transactions | **`dataSync`** ✅ library default — no change needed |
+| 💳 **Fintech / Banking** | Quick pay, transfer, balance check, transactions | `dataSync` |
 | 🎵 Music / Podcast | Audio playback controls | `mediaPlayback` |
 | 🗺️ Navigation / Delivery | Turn-by-turn, live location | `location` |
 | 📞 VoIP / Calling | Active phone or video call | `phoneCall` |
-| 📁 File Manager / Cloud | Upload / download progress | `dataSync` ✅ |
+| 📁 File Manager / Cloud | Upload / download progress | `dataSync` |
 | 🏋️ Fitness / Health | Workout tracking, step counter | `health` |
 | 📷 Camera / Recording | Camera or microphone in use | `camera` / `microphone` |
 | 🔵 IoT / Wearables | Bluetooth or USB device | `connectedDevice` |
 
-> **Fintech apps:** Every action in a financial quick-panel (payment initiation, balance refresh, transaction history) is a network call that reads from or writes to a remote financial server — that is precisely the definition of `dataSync`. **The library default is correct for Fintech. No manifest override is needed.**
-
-If your app falls into a category that requires a different type, override it in your app's `AndroidManifest.xml`:
+Declare the matching permission alongside the type:
 
 ```xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<!-- dataSync -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
-  <application>
-    <!-- Example: override to mediaPlayback for a music player -->
-    <service
-      android:name="com.stickynotification.StickyNotificationService"
-      android:foregroundServiceType="mediaPlayback"
-      tools:replace="android:foregroundServiceType" />
-  </application>
-
-</manifest>
-```
-
-And declare the matching permission:
-
-```xml
 <!-- mediaPlayback -->
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
 <!-- location -->
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
-<!-- health -->
+<!-- health (API 34+) -->
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
 ```
 
-> `FOREGROUND_SERVICE_DATA_SYNC` is already declared by the library. If you switch to a different type, add `tools:remove="android:name"` for the `dataSync` permission or it will remain as an unused declared permission.
+The library reads the type from the merged manifest at runtime — no JS-level prop is required.
 
 ---
 
@@ -1083,8 +1122,9 @@ Financial apps are subject to Google Play's **Financial Services policy** in add
 
 ### 📋 Pre-submission checklist
 
-- [ ] `foregroundServiceType` matches your actual use case (Fintech → `dataSync` ✅ already set)
-- [ ] The matching `FOREGROUND_SERVICE_*` permission is declared (Fintech → `FOREGROUND_SERVICE_DATA_SYNC` ✅ already declared by the library)
+- [ ] `foregroundServiceType` declared in your app manifest via `tools:replace` and matches your actual use case
+- [ ] The matching `FOREGROUND_SERVICE_*` permission is declared in your app manifest
+- [ ] `FOREGROUND_SERVICE` base permission is declared in your app manifest
 - [ ] `POST_NOTIFICATIONS` is requested at runtime with a clear user-facing rationale
 - [ ] The foreground service starts only in response to a direct user action — never silently on launch
 - [ ] `repostOnDismiss` is justified if `true` (quick-actions panels are justified; informational notifications are not)

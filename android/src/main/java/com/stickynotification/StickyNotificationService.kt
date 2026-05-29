@@ -99,14 +99,30 @@ class StickyNotificationService : Service() {
   private fun startForegroundWithNotification(config: Bundle) {
     val notification = StickyNotificationHelper.buildNotification(this, config)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      startForeground(
-        notificationId,
-        notification,
-        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-      )
+      startForeground(notificationId, notification, getDeclaredServiceType())
     } else {
       startForeground(notificationId, notification)
     }
+  }
+
+  /**
+   * Reads the foregroundServiceType bitmask that the host app declared in its
+   * merged AndroidManifest.xml for this service.  This way the library honours
+   * whatever type the app configured (dataSync, mediaPlayback, location, etc.)
+   * without requiring a JS-level prop.  Returns FOREGROUND_SERVICE_TYPE_NONE
+   * (0) when no type is declared, which is valid on Android 10–13; on Android
+   * 14+ the app must declare at least one type in its manifest.
+   */
+  @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
+  private fun getDeclaredServiceType(): Int = try {
+    packageManager
+      .getServiceInfo(
+        android.content.ComponentName(this, StickyNotificationService::class.java),
+        android.content.pm.PackageManager.GET_META_DATA,
+      )
+      .foregroundServiceType
+  } catch (_: Exception) {
+    ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE
   }
 
   override fun onBind(intent: Intent?): IBinder? = null

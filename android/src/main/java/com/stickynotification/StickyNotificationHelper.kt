@@ -47,6 +47,7 @@ import androidx.core.app.NotificationCompat
  *   repostOnDismiss          Boolean  Re-show after swipe on Android 14+ (default: true)
  *   openAppOnAction          Boolean  Open app on button tap (default: false)
  *   closeOnAction            Boolean  Collapse panel on button tap (default: false)
+ *   foregroundServiceBehavior String  "immediate"|"deferred"|"default" (API 31+, default: "default")
  *
  * Button layout
  *   buttonsPerRow            Int      Buttons per row       (default: 5)
@@ -187,6 +188,18 @@ object StickyNotificationHelper {
     colorHex?.let { hex -> runCatching { builder.setColor(Color.parseColor(hex)) } }
     largeIconName?.let { name ->
       loadBitmapFromDrawable(context, name)?.let { bmp -> builder.setLargeIcon(bmp) }
+    }
+
+    // Foreground service notification display behaviour (API 31+).
+    // Controls whether the notification appears immediately or is deferred
+    // by up to 10 seconds while the service is starting.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      val behavior = when (config.getString("foregroundServiceBehavior")) {
+        "immediate" -> NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
+        "deferred"  -> NotificationCompat.FOREGROUND_SERVICE_DEFERRED
+        else        -> NotificationCompat.FOREGROUND_SERVICE_DEFAULT
+      }
+      builder.setForegroundServiceBehavior(behavior)
     }
 
     return builder.build()
